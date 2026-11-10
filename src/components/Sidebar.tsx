@@ -18,16 +18,18 @@ interface SidebarProps {
   currentView: ViewType;
   onChangeView: (view: ViewType) => void;
   pendingCount?: number;
-  isOpen: boolean;
-  onCloseMobile: () => void;
+  isOpen?: boolean;
+  onCloseMobile?: () => void;
+  isMobileDrawer?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onChangeView,
   pendingCount = 0,
-  isOpen,
+  isOpen = false,
   onCloseMobile,
+  isMobileDrawer = false,
 }) => {
   const { logout, adminEmail } = useAuth();
 
@@ -61,125 +63,113 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <>
-      {/* Mobile backdrop overlay */}
-      {isOpen && (
-        <div
-          onClick={onCloseMobile}
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-xs transition-opacity"
-        />
-      )}
+    <aside className="w-full h-full bg-white border-r border-neutral-200 flex flex-col justify-between select-none">
+      {/* Brand Header */}
+      <div className="p-5 sm:p-6 border-b border-neutral-100 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <img
+            src="https://www.gharsoaps.shop/cdn/shop/files/PNG-Logo-Gharsoaps.png?v=1745295691"
+            alt="Ghar Soaps"
+            className="h-7 w-auto object-contain"
+          />
+          <span className="bg-neutral-900 text-white text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">
+            Admin
+          </span>
+        </div>
 
-      <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-72 lg:w-64 bg-white border-r border-neutral-200 flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        {/* Brand Header */}
-        <div className="p-5 sm:p-6 border-b border-neutral-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <img
-              src="https://www.gharsoaps.shop/cdn/shop/files/PNG-Logo-Gharsoaps.png?v=1745295691"
-              alt="Ghar Soaps"
-              className="h-7 w-auto object-contain"
-            />
-            <span className="bg-neutral-900 text-white text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">
-              Admin
-            </span>
-          </div>
-
-          {/* Mobile close button */}
+        {/* Mobile close button (only in mobile drawer) */}
+        {isMobileDrawer && onCloseMobile && (
           <button
             onClick={onCloseMobile}
-            className="lg:hidden p-2 rounded-xl text-neutral-400 hover:text-black hover:bg-neutral-100 transition touch-manipulation"
+            className="p-2 rounded-xl text-neutral-400 hover:text-black hover:bg-neutral-100 transition touch-manipulation"
             aria-label="Close navigation"
           >
             <X className="w-5 h-5" />
           </button>
+        )}
+      </div>
+
+      {/* Navigation Menu */}
+      <div className="p-4 space-y-1.5 flex-1 overflow-y-auto">
+        <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-3 mb-2">
+          Store Navigation
         </div>
 
-        {/* Navigation Menu */}
-        <div className="p-4 space-y-1.5 flex-1 overflow-y-auto">
-          <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-3 mb-2">
-            Store Navigation
-          </div>
-
-          {navItems.map((item) => {
-            const isActive = currentView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onChangeView(item.id);
-                  onCloseMobile();
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition touch-manipulation min-h-[44px] ${
-                  isActive
-                    ? 'bg-neutral-900 text-white shadow-sm'
-                    : 'text-neutral-600 hover:bg-neutral-100 hover:text-black'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {item.icon}
-                  <span>{item.label}</span>
-                </div>
-                {item.badge !== undefined && (
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                      isActive
-                        ? 'bg-amber-400 text-neutral-950'
-                        : 'bg-amber-100 text-amber-900'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          <div className="pt-6">
-            <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-3 mb-2">
-              External Store
-            </div>
-            <a
-              href={process.env.NEXT_PUBLIC_STOREFRONT_URL || 'https://gharsoap.shop'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 hover:text-black transition"
+        {navItems.map((item) => {
+          const isActive = currentView === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                onChangeView(item.id);
+                if (onCloseMobile) onCloseMobile();
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition touch-manipulation min-h-[44px] ${
+                isActive
+                  ? 'bg-neutral-900 text-white shadow-sm'
+                  : 'text-neutral-600 hover:bg-neutral-100 hover:text-black'
+              }`}
             >
               <div className="flex items-center gap-3">
-                <ExternalLink className="w-4 h-4 text-neutral-400" />
-                <span>Open Storefront</span>
+                {item.icon}
+                <span>{item.label}</span>
               </div>
-            </a>
-          </div>
-        </div>
+              {item.badge !== undefined && (
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    isActive
+                      ? 'bg-amber-400 text-neutral-950'
+                      : 'bg-amber-100 text-amber-900'
+                  }`}
+                >
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
 
-        {/* Footer info & Logout */}
-        <div className="p-4 border-t border-neutral-100 space-y-3">
-          <div className="flex items-center gap-2.5 px-3 py-2 bg-neutral-50 rounded-2xl border border-neutral-200/60">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-bold text-neutral-900 truncate">
-                {adminEmail || 'admin@gharsoap.shop'}
-              </div>
-              <div className="text-[10px] text-neutral-400">Store Administrator</div>
-            </div>
+        <div className="pt-6">
+          <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-3 mb-2">
+            External Store
           </div>
-
-          <button
-            onClick={() => {
-              logout();
-              onCloseMobile();
-            }}
-            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition touch-manipulation min-h-[44px]"
+          <a
+            href={process.env.NEXT_PUBLIC_STOREFRONT_URL || 'https://gharsoap.shop'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 hover:text-black transition"
           >
-            <LogOut className="w-4 h-4" />
-            <span>Sign Out</span>
-          </button>
+            <div className="flex items-center gap-3">
+              <ExternalLink className="w-4 h-4 text-neutral-400" />
+              <span>Open Storefront</span>
+            </div>
+          </a>
         </div>
-      </aside>
-    </>
+      </div>
+
+      {/* Footer info & Logout */}
+      <div className="p-4 border-t border-neutral-100 space-y-3">
+        <div className="flex items-center gap-2.5 px-3 py-2 bg-neutral-50 rounded-2xl border border-neutral-200/60">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-bold text-neutral-900 truncate">
+              {adminEmail || 'admin@gharsoap.shop'}
+            </div>
+            <div className="text-[10px] text-neutral-400">Store Administrator</div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            logout();
+            if (onCloseMobile) onCloseMobile();
+          }}
+          className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition touch-manipulation min-h-[44px]"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </aside>
   );
 };

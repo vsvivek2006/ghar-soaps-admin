@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { supabase } from './lib/supabase';
@@ -193,25 +195,45 @@ export const AppContent: React.FC = () => {
   const pendingCount = orders.filter((o) => ['Confirmed', 'Processing'].includes(o.status)).length;
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] flex font-sans">
-      {/* Toast */}
+    <div className="min-h-screen bg-[#f8f9fb] flex flex-row font-sans">
+      {/* Toast Notification */}
       <Toast
         message={toastMessage}
         type={toastType}
         onClose={() => setToastMessage(null)}
       />
 
-      {/* Sidebar */}
-      <Sidebar
-        currentView={currentView}
-        onChangeView={setCurrentView}
-        pendingCount={pendingCount}
-        isOpen={isMobileSidebarOpen}
-        onCloseMobile={() => setIsMobileSidebarOpen(false)}
-      />
+      {/* 1. DESKTOP SIDEBAR: Standard flex child in document flow - CAN NEVER OVERLAP! */}
+      <div className="hidden lg:flex w-64 shrink-0 flex-col min-h-screen border-r border-neutral-200 bg-white">
+        <Sidebar
+          currentView={currentView}
+          onChangeView={setCurrentView}
+          pendingCount={pendingCount}
+        />
+      </div>
 
-      {/* Main Container */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
+      {/* 2. MOBILE DRAWER: Modal overlay on small screens */}
+      {isMobileSidebarOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+          <div className="relative w-72 max-w-[85vw] bg-white z-10 flex flex-col justify-between h-full shadow-2xl animate-fade-in">
+            <Sidebar
+              currentView={currentView}
+              onChangeView={setCurrentView}
+              pendingCount={pendingCount}
+              isOpen={true}
+              onCloseMobile={() => setIsMobileSidebarOpen(false)}
+              isMobileDrawer={true}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 3. MAIN CONTENT CONTAINER: Natural flex-1 sibling */}
+      <div className="flex-1 flex flex-col min-w-0">
         <Navbar
           currentView={currentView}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
@@ -267,4 +289,3 @@ export const AppContent: React.FC = () => {
 export default function App() {
   return <AppContent />;
 }
-
