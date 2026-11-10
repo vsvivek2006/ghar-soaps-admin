@@ -150,7 +150,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
 
               <a
-                href="http://localhost:3000"
+                href={process.env.NEXT_PUBLIC_STOREFRONT_URL || 'https://gharsoap.shop'}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/60 transition text-xs font-bold text-neutral-900"

@@ -155,7 +155,7 @@ export const ProductsView: React.FC = () => {
                     </td>
                     <td className="py-3.5 px-5 text-right whitespace-nowrap">
                       <a
-                        href="http://localhost:3000/#bestsellers"
+                        href={`${process.env.NEXT_PUBLIC_STOREFRONT_URL || 'https://gharsoap.shop'}/#bestsellers`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-[11px] font-bold text-neutral-700 hover:text-black p-1.5 rounded-lg hover:bg-neutral-100 transition"

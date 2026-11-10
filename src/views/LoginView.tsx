@@ -8,18 +8,21 @@ export const LoginView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    setTimeout(() => {
-      const success = login(pin);
-      if (!success) {
-        setError('Invalid Admin PIN. Please try again or check your configuration.');
+    try {
+      const result = await login(pin);
+      if (!result.success) {
+        setError(result.error || 'Invalid Admin Passcode. Please try again.');
       }
+    } catch {
+      setError('Network error validating credentials.');
+    } finally {
       setIsLoading(false);
-    }, 400);
+    }
   };
 
   return (

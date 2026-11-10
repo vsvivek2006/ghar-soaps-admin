@@ -16,7 +16,7 @@ import { ProductsView } from './views/ProductsView';
 import { SettingsView } from './views/SettingsView';
 
 export const AppContent: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth();
 
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -33,16 +33,14 @@ export const AppContent: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const apiBase = import.meta.env.VITE_BACKEND_URL || '';
-  const adminToken = import.meta.env.VITE_ADMIN_PIN || '27906e7eaf';
-
-  // 1. Fetch Orders from Backend API (Authenticated)
+  // 1. Fetch Orders from Admin Next.js Server API (Authenticated)
   const fetchOrders = async () => {
+    if (!token) return;
     try {
       setIsRefreshing(true);
-      const res = await fetch(`${apiBase}/api/orders`, {
+      const res = await fetch('/api/orders', {
         headers: {
-          Authorization: `Bearer ${adminToken}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       const data = await res.json();
@@ -54,18 +52,19 @@ export const AppContent: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Fetch orders error:', err);
-      showToast('Network error connecting to store backend', 'error');
+      showToast('Network error connecting to database', 'error');
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // 2. Fetch VIP Subscribers from Backend API (Authenticated)
+  // 2. Fetch VIP Subscribers from Admin Next.js Server API (Authenticated)
   const fetchSubscribers = async () => {
+    if (!token) return;
     try {
-      const res = await fetch(`${apiBase}/api/newsletter`, {
+      const res = await fetch('/api/newsletter', {
         headers: {
-          Authorization: `Bearer ${adminToken}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       const data = await res.json();
@@ -79,13 +78,13 @@ export const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && token) {
       fetchOrders();
       fetchSubscribers();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, token]);
 
-  // 3. Update Order Status & Courier in Backend API (Authenticated)
+  // 3. Update Order Status & Courier in Next.js Server API (Authenticated)
   const handleUpdateStatus = async (
     orderId: string,
     newStatus: OrderStatus,
@@ -93,12 +92,13 @@ export const AppContent: React.FC = () => {
     trackingNumber?: string,
     note?: string
   ): Promise<boolean> => {
+    if (!token) return false;
     try {
-      const res = await fetch(`${apiBase}/api/orders`, {
+      const res = await fetch('/api/orders', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           id: orderId,
@@ -138,13 +138,14 @@ export const AppContent: React.FC = () => {
     }
   };
 
-  // 4. Delete Order via Backend API (Authenticated)
+  // 4. Delete Order via Next.js Server API (Authenticated)
   const handleDeleteOrder = async (orderId: string): Promise<boolean> => {
+    if (!token) return false;
     try {
-      const res = await fetch(`${apiBase}/api/orders?id=${orderId}`, {
+      const res = await fetch(`/api/orders?id=${orderId}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${adminToken}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 

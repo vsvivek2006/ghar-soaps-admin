@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               External Shortcuts
             </div>
             <a
-              href="http://localhost:3000"
+              href={process.env.NEXT_PUBLIC_STOREFRONT_URL || 'https://gharsoap.shop'}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 hover:text-black transition"
