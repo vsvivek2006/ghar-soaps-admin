@@ -26,6 +26,7 @@ out/
 *.sw?
 
 # Environment variables
+*.tsbuildinfo
 .env
 .env.local
 .env.*.local

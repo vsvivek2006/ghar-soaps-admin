@@ -1,12 +1,29 @@
-import React, { useState } from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Lock, ArrowRight, KeyRound, Sparkles, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
   const { login } = useAuth();
-  const [pin, setPin] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedEmail = localStorage.getItem('gharsoap_admin_email_pref');
+      if (savedEmail) {
+        setEmail(savedEmail);
+      } else {
+        setEmail('admin@gharsoap.shop');
+      }
+    } catch {
+      setEmail('admin@gharsoap.shop');
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,92 +31,120 @@ export const LoginView: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const result = await login(pin);
+      const result = await login(email, password);
       if (!result.success) {
-        setError(result.error || 'Invalid Admin Passcode. Please try again.');
+        setError(result.error || 'Invalid email or password.');
+      } else {
+        try {
+          localStorage.setItem('gharsoap_admin_email_pref', email.trim());
+        } catch {
+          // ignore storage errors
+        }
       }
     } catch {
-      setError('Network error validating credentials.');
+      setError('An unexpected connection error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-neutral-200/80 p-8 sm:p-10 space-y-6 animate-fade-in">
+    <div className="min-h-screen bg-[#f7f6f2] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-neutral-200/90 p-6 sm:p-10 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-neutral-900 text-white flex items-center justify-center mx-auto shadow-md">
-            <Lock className="w-7 h-7 text-emerald-400" />
+          <div className="w-16 h-16 rounded-2xl bg-neutral-900 text-white flex items-center justify-center mx-auto shadow-md">
+            <img
+              src="https://www.gharsoaps.shop/cdn/shop/files/PNG-Logo-Gharsoaps.png?v=1745295691"
+              alt="Ghar Soaps"
+              className="h-9 w-auto object-contain brightness-0 invert"
+              onError={(e) => {
+                // fallback if image blocked
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
           </div>
-          <h2 className="text-2xl font-extrabold text-neutral-900 tracking-tight font-heading pt-2">
+          <h1 className="text-2xl font-extrabold text-neutral-900 tracking-tight font-heading pt-2">
             Ghar Soaps Admin
-          </h2>
+          </h1>
           <p className="text-xs text-neutral-500 font-medium">
-            Enter your secure admin passcode to access live orders & store operations.
+            Sign in with your email and password to manage store orders and customers.
           </p>
         </div>
 
         {/* Error Alert */}
         {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3.5 rounded-2xl flex items-center gap-2.5 animate-shake">
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3.5 rounded-2xl flex items-center gap-2.5">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-            <span>{error}</span>
+            <span className="font-medium leading-relaxed">{error}</span>
           </div>
         )}
 
-        {/* Form */}
+        {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Email */}
           <div>
-            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">
-              Admin Passcode / PIN
+            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
+              Email Address
             </label>
             <div className="relative">
-              <KeyRound className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Mail className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                type="password"
+                type="email"
                 required
-                autoFocus
-                placeholder="Enter security PIN"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-neutral-300 text-sm font-semibold tracking-wider text-neutral-900 focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition"
+                autoComplete="email"
+                placeholder="admin@gharsoap.shop"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-neutral-300 text-sm font-medium text-neutral-900 focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition"
               />
             </div>
           </div>
 
+          {/* Password */}
+          <div>
+            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                autoComplete="current-password"
+                placeholder="Enter your admin password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-10 pr-11 py-3 rounded-2xl border border-neutral-300 text-sm font-medium text-neutral-900 focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 p-1"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Submit Button */}
           <button
             type="submit"
-            disabled={isLoading || !pin.trim()}
-            className="w-full bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white py-3 rounded-2xl font-extrabold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+            disabled={isLoading || !email.trim() || !password}
+            className="w-full bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-[0.99] touch-manipulation min-h-[48px]"
           >
-            <span>{isLoading ? 'Authenticating...' : 'Unlock Admin Portal'}</span>
+            <span>{isLoading ? 'Signing In...' : 'Sign In to Dashboard'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* Security Hex Passcode Hint */}
-        <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-200/60 text-center space-y-1">
-          <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-neutral-800">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>10-Digit Hex Auth Passcode</span>
-          </div>
-          <div className="text-xs font-mono font-bold text-neutral-900 bg-white border border-neutral-200 py-1 px-3 rounded-lg inline-block">
-            27906e7eaf
-          </div>
-          <p className="text-[10px] text-neutral-400 pt-0.5">
-            Configured in <code className="text-neutral-700 font-mono">.env.local</code> (<code className="text-neutral-700 font-mono">VITE_ADMIN_PIN</code>)
-          </p>
-        </div>
-
-        {/* Trust Badges */}
-        <div className="flex items-center justify-center gap-2 text-[11px] text-neutral-400 font-semibold pt-2">
+        {/* Security badge */}
+        <div className="pt-2 text-center border-t border-neutral-100 flex items-center justify-center gap-2 text-[11px] text-neutral-400 font-semibold">
           <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>Protected with Supabase Row-Level Security</span>
+          <span>Encrypted Store Session</span>
         </div>
       </div>
     </div>
   );
 };
-

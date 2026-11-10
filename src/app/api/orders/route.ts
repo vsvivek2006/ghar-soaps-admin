@@ -4,17 +4,35 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-function verifyAdminAuth(request: Request): boolean {
+async function verifyAdminAuth(request: Request): Promise<boolean> {
   const authHeader = request.headers.get('authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  const expected = (process.env.ADMIN_SECRET_TOKEN || '27906e7eaf').trim();
+  if (!token) return false;
 
-  if (!token || token.length !== expected.length) return false;
-  try {
-    return crypto.timingSafeEqual(Buffer.from(token, 'utf-8'), Buffer.from(expected, 'utf-8'));
-  } catch {
-    return false;
+  // 1. Check if token is the backup ADMIN_SECRET_TOKEN
+  const expectedSecret = (process.env.ADMIN_SECRET_TOKEN || '').trim();
+  if (expectedSecret && token.length === expectedSecret.length) {
+    try {
+      if (crypto.timingSafeEqual(Buffer.from(token, 'utf-8'), Buffer.from(expectedSecret, 'utf-8'))) {
+        return true;
+      }
+    } catch {
+      // continue to Supabase JWT verification
+    }
   }
+
+  // 2. Check Supabase Auth JWT session token
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (!error && user?.id) {
+      return true;
+    }
+  } catch {
+    // Auth failed
+  }
+
+  return false;
 }
 
 function cleanInput(val: any, max = 250): string {
@@ -22,10 +40,11 @@ function cleanInput(val: any, max = 250): string {
   return val.trim().slice(0, max).replace(/[<>]/g, '');
 }
 
-// 1. GET: Fetch all orders from Supabase directly
+// 1. GET: Fetch all orders
 export async function GET(request: Request) {
   try {
-    if (!verifyAdminAuth(request)) {
+    const isAuthed = await verifyAdminAuth(request);
+    if (!isAuthed) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
     }
 
@@ -59,10 +78,11 @@ export async function GET(request: Request) {
   }
 }
 
-// 2. PATCH: Update order status & courier
+// 2. PATCH: Update order status & courier tracking
 export async function PATCH(request: Request) {
   try {
-    if (!verifyAdminAuth(request)) {
+    const isAuthed = await verifyAdminAuth(request);
+    if (!isAuthed) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
     }
 
@@ -128,7 +148,8 @@ export async function PATCH(request: Request) {
 // 3. DELETE: Delete order
 export async function DELETE(request: Request) {
   try {
-    if (!verifyAdminAuth(request)) {
+    const isAuthed = await verifyAdminAuth(request);
+    if (!isAuthed) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
     }
 
@@ -153,4 +174,3 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Server error processing deletion.' }, { status: 500 });
   }
 }
-

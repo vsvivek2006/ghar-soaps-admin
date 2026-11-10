@@ -4,22 +4,41 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-function verifyAdminAuth(request: Request): boolean {
+async function verifyAdminAuth(request: Request): Promise<boolean> {
   const authHeader = request.headers.get('authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  const expected = (process.env.ADMIN_SECRET_TOKEN || '27906e7eaf').trim();
+  if (!token) return false;
 
-  if (!token || token.length !== expected.length) return false;
-  try {
-    return crypto.timingSafeEqual(Buffer.from(token, 'utf-8'), Buffer.from(expected, 'utf-8'));
-  } catch {
-    return false;
+  // 1. Check backup ADMIN_SECRET_TOKEN
+  const expectedSecret = (process.env.ADMIN_SECRET_TOKEN || '').trim();
+  if (expectedSecret && token.length === expectedSecret.length) {
+    try {
+      if (crypto.timingSafeEqual(Buffer.from(token, 'utf-8'), Buffer.from(expectedSecret, 'utf-8'))) {
+        return true;
+      }
+    } catch {
+      // continue to JWT verification
+    }
   }
+
+  // 2. Check Supabase Auth JWT token
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (!error && user?.id) {
+      return true;
+    }
+  } catch {
+    // Auth failed
+  }
+
+  return false;
 }
 
 export async function GET(request: Request) {
   try {
-    if (!verifyAdminAuth(request)) {
+    const isAuthed = await verifyAdminAuth(request);
+    if (!isAuthed) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
     }
 
@@ -40,4 +59,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Server error retrieving subscribers.' }, { status: 500 });
   }
 }
-

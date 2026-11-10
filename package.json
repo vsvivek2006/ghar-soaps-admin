@@ -6,7 +6,10 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "lint": "next lint"
+    "lint": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.46.1",

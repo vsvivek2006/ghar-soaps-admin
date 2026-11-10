@@ -16,7 +16,7 @@ import { ProductsView } from './views/ProductsView';
 import { SettingsView } from './views/SettingsView';
 
 export const AppContent: React.FC = () => {
-  const { isAuthenticated, token } = useAuth();
+  const { isAuthenticated, token, isLoading } = useAuth();
 
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -172,6 +172,19 @@ export const AppContent: React.FC = () => {
     exportOrdersToCSV(orders);
     showToast('Orders exported to CSV successfully!');
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f7f6f2] flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-3 border-neutral-300 border-t-neutral-900 rounded-full animate-spin" />
+          <span className="text-xs font-bold text-neutral-600 uppercase tracking-wider">
+            Loading Admin Session...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <LoginView />;
