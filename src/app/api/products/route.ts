@@ -43,36 +43,24 @@ function cleanInput(val: unknown, max = 250): string {
 
 async function fetchFullCatalog() {
   const supabaseAdmin = getSupabaseAdmin();
-  const [{ data: products, error: pErr }, { data: variants, error: vErr }] = await Promise.all([
-    supabaseAdmin
-      .from('products')
-      .select('*')
-      .order('sort_order', { ascending: true })
-      .order('id', { ascending: true }),
-    supabaseAdmin
-      .from('product_variants')
-      .select('*')
-      .order('position', { ascending: true })
-      .order('id', { ascending: true }),
-  ]);
+  // Single high-speed PostgREST embedded join (1 round-trip)
+  const { data: products, error } = await supabaseAdmin
+    .from('products')
+    .select('*, product_variants(*)')
+    .order('sort_order', { ascending: true })
+    .order('id', { ascending: true });
 
-  if (pErr) throw pErr;
-  if (vErr) throw vErr;
+  if (error || !products) throw error || new Error('Failed to load products');
 
-  const varMap = new Map<number, any[]>();
-  for (const v of variants || []) {
-    const pid = Number(v.product_id);
-    const list = varMap.get(pid) || [];
-    list.push(v);
-    varMap.set(pid, list);
-  }
-
-  return (products || []).map((p) => {
-    const prodVariants = varMap.get(Number(p.id)) || [];
-    const totalStockQty = prodVariants.reduce((sum, v) => sum + (Number(v.stock_qty) || 0), 0);
+  return products.map((p) => {
+    const prodVariants = (p.product_variants || []).sort(
+      (a: any, b: any) => (a.position ?? 0) - (b.position ?? 0)
+    );
+    const totalStockQty = prodVariants.reduce((sum: number, v: any) => sum + (Number(v.stock_qty) || 0), 0);
     const primaryStockQty = prodVariants[0]?.stock_qty ?? (p.stock_status === 'out_of_stock' ? 0 : 100);
     return {
       ...p,
+      product_variants: prodVariants,
       variants: prodVariants,
       stock_qty: prodVariants.length > 0 ? primaryStockQty : 100,
       total_stock_qty: totalStockQty,

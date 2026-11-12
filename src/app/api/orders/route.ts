@@ -51,6 +51,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const phone = searchParams.get('phone');
+    const status = searchParams.get('status');
     const supabaseAdmin = getSupabaseAdmin();
 
     let query = supabaseAdmin
@@ -61,7 +62,11 @@ export async function GET(request: Request) {
       query = query.eq('id', cleanInput(id, 20).toUpperCase());
     } else if (phone) {
       query = query.eq('phone', cleanInput(phone, 15).replace(/\D/g, ''));
+    } else if (status) {
+      // Uses idx_orders_status_created (status, created_at DESC)
+      query = query.eq('status', cleanInput(status, 50)).order('created_at', { ascending: false }).limit(200);
     } else {
+      // Uses idx_orders_created_at B-tree index
       query = query.order('created_at', { ascending: false }).limit(200);
     }
 

@@ -70,20 +70,48 @@ export async function GET(request: Request) {
 
     const orders = ordersData || [];
 
-    // 3. Map Auth Users
+    // O(N) pre-index orders by phone (last 10 digits) and email (lowercase)
+    const ordersByPhone = new Map<string, any[]>();
+    const ordersByEmail = new Map<string, any[]>();
+
+    for (const o of orders) {
+      if (o.phone) {
+        const cleanP = String(o.phone).replace(/\D/g, '').slice(-10);
+        if (cleanP) {
+          const list = ordersByPhone.get(cleanP) || [];
+          list.push(o);
+          ordersByPhone.set(cleanP, list);
+        }
+      }
+      if (o.email) {
+        const cleanE = String(o.email).toLowerCase().trim();
+        if (cleanE) {
+          const list = ordersByEmail.get(cleanE) || [];
+          list.push(o);
+          ordersByEmail.set(cleanE, list);
+        }
+      }
+    }
+
+    // 3. Map Auth Users in O(M) time using O(1) hash map lookups
     const customers = authData.users.map((u) => {
       const meta = u.user_metadata || {};
       const isInternalEmail = u.email?.endsWith('@customer.gharsoaps.shop');
       const email = isInternalEmail ? undefined : u.email;
       const phone = meta.phone || (isInternalEmail && u.email ? u.email.split('@')[0] : undefined);
+      const cleanPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : undefined;
+      const cleanEmail = email ? String(email).toLowerCase().trim() : undefined;
       const fullName = meta.full_name || meta.name || (email ? email.split('@')[0] : phone ? `Customer ${phone}` : 'Customer');
 
-      // Filter user's orders
-      const userOrders = orders.filter((o) => {
-        const matchPhone = phone && o.phone && o.phone.replace(/\D/g, '').slice(-10) === phone.replace(/\D/g, '').slice(-10);
-        const matchEmail = email && o.email && o.email.toLowerCase() === email.toLowerCase();
-        return matchPhone || matchEmail;
-      });
+      // Fast O(1) deduplicated matching
+      const userOrdersMap = new Map<string, any>();
+      if (cleanPhone) {
+        for (const o of ordersByPhone.get(cleanPhone) || []) userOrdersMap.set(o.id, o);
+      }
+      if (cleanEmail) {
+        for (const o of ordersByEmail.get(cleanEmail) || []) userOrdersMap.set(o.id, o);
+      }
+      const userOrders = Array.from(userOrdersMap.values());
 
       const totalSpent = userOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
       const orderCount = userOrders.length;
