@@ -45,10 +45,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="bg-white border-b border-neutral-200 sticky top-0 z-30 shadow-xs px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
       <div className="flex items-center gap-3">
-        {/* Mobile menu hamburger button */}
+        {/* Mobile menu hamburger button (< 768px) */}
         <button
           onClick={onOpenMobileSidebar}
-          className="lg:hidden p-2 -ml-1 rounded-xl text-neutral-700 hover:bg-neutral-100 transition touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+          className="md:hidden p-2 -ml-1 rounded-xl text-neutral-700 hover:bg-neutral-100 transition touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
           aria-label="Open navigation menu"
         >
           <Menu className="w-5 h-5" />

@@ -203,8 +203,8 @@ export const AppContent: React.FC = () => {
         onClose={() => setToastMessage(null)}
       />
 
-      {/* 1. DESKTOP SIDEBAR: Standard flex child in document flow - CAN NEVER OVERLAP! */}
-      <div className="hidden lg:flex w-64 shrink-0 flex-col min-h-screen border-r border-neutral-200 bg-white">
+      {/* 1. DESKTOP SIDEBAR: Standard flex child in document flow - Always visible on desktop (md:flex, >= 768px) */}
+      <div className="hidden md:flex w-64 shrink-0 flex-col sticky top-0 h-screen border-r border-neutral-200 bg-white z-20">
         <Sidebar
           currentView={currentView}
           onChangeView={setCurrentView}
@@ -212,9 +212,9 @@ export const AppContent: React.FC = () => {
         />
       </div>
 
-      {/* 2. MOBILE DRAWER: Modal overlay on small screens */}
+      {/* 2. MOBILE DRAWER: Modal overlay on small screens (< 768px) */}
       {isMobileSidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="md:hidden fixed inset-0 z-50 flex">
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
             onClick={() => setIsMobileSidebarOpen(false)}
