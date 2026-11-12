@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './context/AuthContext';
 import { supabase } from './lib/supabase';
 import { Order, OrderStatus, Subscriber, RegisteredCustomer, ContactInquiry, InquiryStatus } from './types';
@@ -32,14 +32,14 @@ export const AppContent: React.FC = () => {
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+  const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
     setToastType(type);
     setTimeout(() => setToastMessage(null), 3500);
-  };
+  }, []);
 
   // 1. Fetch Orders from Admin Next.js Server API (Authenticated)
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     if (!token) return;
     try {
       setIsRefreshing(true);
@@ -61,10 +61,10 @@ export const AppContent: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [token, showToast]);
 
   // 2. Fetch Registered Customers from Supabase Auth & Analytics
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     if (!token) return;
     try {
       const res = await fetch('/api/customers', {
@@ -79,10 +79,10 @@ export const AppContent: React.FC = () => {
     } catch (err) {
       console.error('Fetch customers error:', err);
     }
-  };
+  }, [token]);
 
   // 3. Fetch VIP Subscribers from Admin Next.js Server API (Authenticated)
-  const fetchSubscribers = async () => {
+  const fetchSubscribers = useCallback(async () => {
     if (!token) return;
     try {
       const res = await fetch('/api/newsletter', {
@@ -98,10 +98,10 @@ export const AppContent: React.FC = () => {
     } catch (err) {
       console.error('Fetch subscribers error:', err);
     }
-  };
+  }, [token]);
 
   // 3b. Fetch Contact Form Inquiries from Admin Next.js Server API (Authenticated)
-  const fetchContacts = async () => {
+  const fetchContacts = useCallback(async () => {
     if (!token) return;
     try {
       const res = await fetch('/api/contacts', {
@@ -116,19 +116,19 @@ export const AppContent: React.FC = () => {
     } catch (err) {
       console.error('Fetch contacts error:', err);
     }
-  };
+  }, [token]);
 
-  const refreshAllData = async () => {
+  const refreshAllData = useCallback(async () => {
     setIsRefreshing(true);
     await Promise.all([fetchOrders(), fetchCustomers(), fetchSubscribers(), fetchContacts()]);
     setIsRefreshing(false);
-  };
+  }, [fetchOrders, fetchCustomers, fetchSubscribers, fetchContacts]);
 
   useEffect(() => {
     if (isAuthenticated && token) {
       refreshAllData();
     }
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, token, refreshAllData]);
 
   // 4. Update Order Status, Courier, and Customer Details in Next.js Server API
   const handleUpdateStatus = async (
@@ -372,11 +372,15 @@ export const AppContent: React.FC = () => {
     return <LoginView />;
   }
 
-  const pendingCount = orders.filter((o) =>
-    ['Confirmed', 'Processing'].includes(o.status)
-  ).length;
+  const pendingCount = useMemo(
+    () => orders.filter((o) => ['Confirmed', 'Processing'].includes(o.status)).length,
+    [orders]
+  );
 
-  const newInquiriesCount = inquiries.filter((i) => i.status === 'New').length;
+  const newInquiriesCount = useMemo(
+    () => inquiries.filter((i) => i.status === 'New').length,
+    [inquiries]
+  );
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-row font-sans text-neutral-900 antialiased">

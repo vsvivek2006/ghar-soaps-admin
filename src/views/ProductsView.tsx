@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { formatPrice } from '../lib/utils';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import {
   Package,
   Search,
@@ -74,6 +75,7 @@ function getProductCategory(p: any): string {
 export const ProductsView: React.FC = () => {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   // Modal states
@@ -219,14 +221,19 @@ export const ProductsView: React.FC = () => {
     }
   };
 
-  const categories = ['All', 'Soaps', 'Face Care', 'Body Care', 'Serums & Oils', 'Combos & Gift Sets'];
+  const categories = useMemo(
+    () => ['All', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))],
+    [products]
+  );
 
-  const filtered = products.filter((p) => {
-    const matchesCat = selectedCategory === 'All' || p.category === selectedCategory;
-    const q = searchQuery.toLowerCase().trim();
-    const matchesQuery = !q || p.title.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q);
-    return matchesCat && matchesQuery;
-  });
+  const filtered = useMemo(() => {
+    const q = debouncedSearch.toLowerCase().trim();
+    return products.filter((p) => {
+      const matchesCat = selectedCategory === 'All' || p.category === selectedCategory;
+      const matchesQuery = !q || p.title.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q);
+      return matchesCat && matchesQuery;
+    });
+  }, [products, selectedCategory, debouncedSearch]);
 
   return (
     <div className="space-y-4 sm:space-y-5">

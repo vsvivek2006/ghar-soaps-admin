@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Order, OrderStatus } from '../types';
 import { MetricCard } from '../components/MetricCard';
 import { StatusBadge } from '../components/StatusBadge';
@@ -40,18 +40,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onChangeView,
   onExportCSV,
 }) => {
-  const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-  const totalOrders = orders.length;
-  const pendingOrders = orders.filter((o) => ['Confirmed', 'Processing'].includes(o.status)).length;
-  const shippedOrders = orders.filter((o) => ['Shipped', 'Out for Delivery'].includes(o.status)).length;
-  const deliveredOrders = orders.filter((o) => o.status === 'Delivered').length;
-  const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-
-  // Prepaid vs COD breakdown
-  const codOrders = orders.filter((o) => (o.payment_method || '').toLowerCase().includes('cod')).length;
-  const prepaidOrders = totalOrders - codOrders;
-
-  const recentOrders = orders.slice(0, 6);
+  const {
+    totalRevenue,
+    totalOrders,
+    pendingOrders,
+    shippedOrders,
+    deliveredOrders,
+    avgOrderValue,
+    codOrders,
+    prepaidOrders,
+    recentOrders,
+  } = useMemo(() => {
+    let rev = 0;
+    let pending = 0;
+    let shipped = 0;
+    let delivered = 0;
+    let cod = 0;
+    for (const o of orders) {
+      rev += Number(o.total) || 0;
+      if (o.status === 'Confirmed' || o.status === 'Processing') pending++;
+      else if (o.status === 'Shipped' || o.status === 'Out for Delivery') shipped++;
+      else if (o.status === 'Delivered') delivered++;
+      if ((o.payment_method || '').toLowerCase().includes('cod')) cod++;
+    }
+    const totalCount = orders.length;
+    return {
+      totalRevenue: rev,
+      totalOrders: totalCount,
+      pendingOrders: pending,
+      shippedOrders: shipped,
+      deliveredOrders: delivered,
+      avgOrderValue: totalCount > 0 ? Math.round(rev / totalCount) : 0,
+      codOrders: cod,
+      prepaidOrders: totalCount - cod,
+      recentOrders: orders.slice(0, 6),
+    };
+  }, [orders]);
 
   return (
     <div className="space-y-5 sm:space-y-6">

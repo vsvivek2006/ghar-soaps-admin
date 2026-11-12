@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Order, OrderStatus } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatPrice, formatDate } from '../lib/utils';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import {
   Search,
   Download,
@@ -32,26 +33,37 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 }) => {
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [paymentFilter, setPaymentFilter] = useState<string>('All');
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesStatus = selectedStatus === 'All' || order.status === selectedStatus;
-    const matchesPayment =
-      paymentFilter === 'All' ||
-      (paymentFilter === 'cod' && order.payment_method?.toLowerCase() === 'cod') ||
-      (paymentFilter === 'prepaid' && order.payment_method?.toLowerCase() !== 'cod');
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: orders.length };
+    for (const o of orders) {
+      counts[o.status] = (counts[o.status] || 0) + 1;
+    }
+    return counts;
+  }, [orders]);
 
-    const q = searchQuery.toLowerCase().trim();
-    const matchesQuery =
-      !q ||
-      order.id.toLowerCase().includes(q) ||
-      order.customer_name.toLowerCase().includes(q) ||
-      order.phone.includes(q) ||
-      order.city.toLowerCase().includes(q) ||
-      order.pincode.includes(q);
+  const filteredOrders = useMemo(() => {
+    const q = debouncedSearch.toLowerCase().trim();
+    return orders.filter((order) => {
+      const matchesStatus = selectedStatus === 'All' || order.status === selectedStatus;
+      const matchesPayment =
+        paymentFilter === 'All' ||
+        (paymentFilter === 'cod' && order.payment_method?.toLowerCase() === 'cod') ||
+        (paymentFilter === 'prepaid' && order.payment_method?.toLowerCase() !== 'cod');
 
-    return matchesStatus && matchesPayment && matchesQuery;
-  });
+      const matchesQuery =
+        !q ||
+        order.id.toLowerCase().includes(q) ||
+        order.customer_name.toLowerCase().includes(q) ||
+        order.phone.includes(q) ||
+        order.city.toLowerCase().includes(q) ||
+        order.pincode.includes(q);
+
+      return matchesStatus && matchesPayment && matchesQuery;
+    });
+  }, [orders, selectedStatus, paymentFilter, debouncedSearch]);
 
   const statuses: (OrderStatus | 'All')[] = [
     'All',
@@ -70,7 +82,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         {/* Horizontally Scrollable Status Pills (Finger-friendly for mobile) */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar scroll-smooth">
           {statuses.map((st) => {
-            const count = st === 'All' ? orders.length : orders.filter((o) => o.status === st).length;
+            const count = statusCounts[st] || 0;
             const isSelected = selectedStatus === st;
             return (
               <button

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Order, Subscriber, RegisteredCustomer } from '../types';
 import { formatPrice, formatDate, formatDateTime } from '../lib/utils';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import {
   Users,
   Mail,
@@ -40,6 +41,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
 }) => {
   const [tab, setTab] = useState<'registered' | 'buyers' | 'subscribers'>('registered');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
 
   // Editing state
   const [editingCustomer, setEditingCustomer] = useState<RegisteredCustomer | null>(null);
@@ -51,45 +53,47 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
   // Selected customer for viewing orders
   const [viewingOrdersCustomer, setViewingOrdersCustomer] = useState<RegisteredCustomer | null>(null);
 
-  // Extract unique buyers from orders by phone
-  const customerMap = new Map<
-    string,
-    {
-      name: string;
-      phone: string;
-      email?: string;
-      city: string;
-      state: string;
-      totalSpent: number;
-      orderCount: number;
-      lastOrderDate: string;
-    }
-  >();
-
-  orders.forEach((o) => {
-    const key = o.phone.trim();
-    if (!customerMap.has(key)) {
-      customerMap.set(key, {
-        name: o.customer_name,
-        phone: o.phone,
-        email: o.email,
-        city: o.city,
-        state: o.state,
-        totalSpent: Number(o.total) || 0,
-        orderCount: 1,
-        lastOrderDate: o.created_at,
-      });
-    } else {
-      const existing = customerMap.get(key)!;
-      existing.totalSpent += Number(o.total) || 0;
-      existing.orderCount += 1;
-      if (new Date(o.created_at) > new Date(existing.lastOrderDate)) {
-        existing.lastOrderDate = o.created_at;
+  // Memoize aggregated buyers map from orders
+  const orderBuyers = useMemo(() => {
+    const customerMap = new Map<
+      string,
+      {
+        name: string;
+        phone: string;
+        email?: string;
+        city: string;
+        state: string;
+        totalSpent: number;
+        orderCount: number;
+        lastOrderDate: string;
       }
-    }
-  });
+    >();
 
-  const orderBuyers = Array.from(customerMap.values());
+    orders.forEach((o) => {
+      const key = o.phone.trim();
+      if (!customerMap.has(key)) {
+        customerMap.set(key, {
+          name: o.customer_name,
+          phone: o.phone,
+          email: o.email,
+          city: o.city,
+          state: o.state,
+          totalSpent: Number(o.total) || 0,
+          orderCount: 1,
+          lastOrderDate: o.created_at,
+        });
+      } else {
+        const existing = customerMap.get(key)!;
+        existing.totalSpent += Number(o.total) || 0;
+        existing.orderCount += 1;
+        if (new Date(o.created_at) > new Date(existing.lastOrderDate)) {
+          existing.lastOrderDate = o.created_at;
+        }
+      }
+    });
+
+    return Array.from(customerMap.values());
+  }, [orders]);
 
   const handleOpenEdit = (c: RegisteredCustomer) => {
     setEditingCustomer(c);
@@ -120,36 +124,33 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
     }
   };
 
-  // Filter lists by search query
-  const filteredRegistered = registeredCustomers.filter((c) => {
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      !q ||
-      c.full_name.toLowerCase().includes(q) ||
-      (c.phone && c.phone.includes(q)) ||
-      (c.email && c.email.toLowerCase().includes(q))
-    );
-  });
-
-  const filteredBuyers = orderBuyers.filter((c) => {
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      !q ||
-      c.name.toLowerCase().includes(q) ||
-      c.phone.includes(q) ||
-      (c.email && c.email.toLowerCase().includes(q)) ||
-      c.city.toLowerCase().includes(q)
-    );
-  });
-
-  const filteredSubscribers = subscribers.filter((s) => {
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      !q ||
-      (s.email && s.email.toLowerCase().includes(q)) ||
-      (s.phone && s.phone.includes(q))
-    );
-  });
+  // Filter lists by debounced search query
+  const { filteredRegistered, filteredBuyers, filteredSubscribers } = useMemo(() => {
+    const q = debouncedSearch.toLowerCase().trim();
+    return {
+      filteredRegistered: registeredCustomers.filter(
+        (c) =>
+          !q ||
+          c.full_name.toLowerCase().includes(q) ||
+          (c.phone && c.phone.includes(q)) ||
+          (c.email && c.email.toLowerCase().includes(q))
+      ),
+      filteredBuyers: orderBuyers.filter(
+        (c) =>
+          !q ||
+          c.name.toLowerCase().includes(q) ||
+          c.phone.includes(q) ||
+          (c.email && c.email.toLowerCase().includes(q)) ||
+          c.city.toLowerCase().includes(q)
+      ),
+      filteredSubscribers: subscribers.filter(
+        (s) =>
+          !q ||
+          (s.email && s.email.toLowerCase().includes(q)) ||
+          (s.phone && s.phone.includes(q))
+      ),
+    };
+  }, [registeredCustomers, orderBuyers, subscribers, debouncedSearch]);
 
   return (
     <div className="space-y-5 sm:space-y-6">

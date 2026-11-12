@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ContactInquiry, InquiryStatus } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatDateTime } from '../lib/utils';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import {
   Search,
   Mail,
@@ -29,23 +30,34 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
 }) => {
   const [statusFilter, setStatusFilter] = useState<'All' | InquiryStatus>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
   const [editingStatuses, setEditingStatuses] = useState<Record<string, InquiryStatus>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  const filtered = inquiries.filter((inq) => {
-    const matchesStatus = statusFilter === 'All' || inq.status === statusFilter;
-    const q = searchQuery.toLowerCase().trim();
-    const matchesQuery =
-      !q ||
-      inq.id.toLowerCase().includes(q) ||
-      inq.name.toLowerCase().includes(q) ||
-      inq.email.toLowerCase().includes(q) ||
-      (inq.phone || '').includes(q) ||
-      (inq.order_id || '').toLowerCase().includes(q) ||
-      inq.message.toLowerCase().includes(q);
-    return matchesStatus && matchesQuery;
-  });
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: inquiries.length };
+    for (const i of inquiries) {
+      counts[i.status] = (counts[i.status] || 0) + 1;
+    }
+    return counts;
+  }, [inquiries]);
+
+  const filtered = useMemo(() => {
+    const q = debouncedSearch.toLowerCase().trim();
+    return inquiries.filter((inq) => {
+      const matchesStatus = statusFilter === 'All' || inq.status === statusFilter;
+      const matchesQuery =
+        !q ||
+        inq.id.toLowerCase().includes(q) ||
+        inq.name.toLowerCase().includes(q) ||
+        inq.email.toLowerCase().includes(q) ||
+        (inq.phone || '').includes(q) ||
+        (inq.order_id || '').toLowerCase().includes(q) ||
+        inq.message.toLowerCase().includes(q);
+      return matchesStatus && matchesQuery;
+    });
+  }, [inquiries, statusFilter, debouncedSearch]);
 
   const handleSave = async (inq: ContactInquiry) => {
     setSavingId(inq.id);
@@ -63,7 +75,7 @@ export const ContactsView: React.FC<ContactsViewProps> = ({
       <div className="bg-white p-4 sm:p-5 rounded-3xl border border-neutral-200/90 shadow-xs space-y-3.5">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
           {statuses.map((st) => {
-            const count = st === 'All' ? inquiries.length : inquiries.filter((i) => i.status === st).length;
+            const count = statusCounts[st] || 0;
             const active = statusFilter === st;
             return (
               <button
