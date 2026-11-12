@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import productsData from '../data/products.json';
 
+const FALLBACK_PRODUCT_IMG =
+  'https://mlglwjaxvmcswesysipt.supabase.co/storage/v1/object/public/store-assets/catalog/acd01ae19e-1-2_486ce64b-b1be-401c-a596-a0d19973b3f0.webp';
+
 export interface AdminProduct {
   id: number | string;
   title: string;
@@ -31,6 +34,7 @@ export interface AdminProduct {
   badge?: string;
   category: string;
   stock_status: 'in_stock' | 'low_stock' | 'out_of_stock';
+  stock_qty?: number;
   images: string[];
 }
 
@@ -58,7 +62,7 @@ function getProductImage(p: any): string {
     if (typeof first === 'string') return first;
     if (first && typeof first.src === 'string') return first.src;
   }
-  return 'https://www.gharsoaps.shop/cdn/shop/files/magicsoap_1.jpg?v=1785932125&width=400';
+  return FALLBACK_PRODUCT_IMG;
 }
 
 function getProductCategory(p: any): string {
@@ -72,11 +76,18 @@ function getProductCategory(p: any): string {
   return 'Ayurvedic Skincare';
 }
 
-export const ProductsView: React.FC = () => {
+interface ProductsViewProps {
+  token?: string | null;
+}
+
+export const ProductsView: React.FC<ProductsViewProps> = ({ token }) => {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Modal states
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
@@ -88,28 +99,13 @@ export const ProductsView: React.FC = () => {
   const [formComparePrice, setFormComparePrice] = useState<number>(399);
   const [formCategory, setFormCategory] = useState('Soaps');
   const [formStock, setFormStock] = useState<'in_stock' | 'low_stock' | 'out_of_stock'>('in_stock');
+  const [formStockQty, setFormStockQty] = useState<number>(100);
   const [formBadge, setFormBadge] = useState('');
   const [formRating, setFormRating] = useState<number>(4.9);
   const [formReviewsCount, setFormReviewsCount] = useState<number>(120);
   const [formImage, setFormImage] = useState('');
 
-  const STORAGE_KEY = 'ghar_admin_products_override';
-
-  // Load initial products (check localStorage first for admin updates)
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setProducts(parsed);
-          return;
-        }
-      }
-    } catch {
-      // fallback to initial data
-    }
-
+  const loadFallbackCatalog = () => {
     const rawProducts: any[] = productsData as any[];
     const normalized: AdminProduct[] = rawProducts.map((p) => ({
       id: p.id,
@@ -122,20 +118,53 @@ export const ProductsView: React.FC = () => {
       badge: p.badge || (p.title.includes('Magic') ? 'Bestseller' : ''),
       category: getProductCategory(p),
       stock_status: 'in_stock',
+      stock_qty: 100,
       images: [getProductImage(p)],
     }));
-
     setProducts(normalized);
-  }, []);
+  };
 
-  const saveProductsToStorage = (updated: AdminProduct[]) => {
-    setProducts(updated);
+  const fetchProductsFromDb = async () => {
+    if (!token) {
+      loadFallbackCatalog();
+      return;
+    }
+    setIsLoading(true);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      const res = await fetch('/api/products', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.data) && data.data.length > 0) {
+        const mapped: AdminProduct[] = data.data.map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          handle: p.handle,
+          price: Number(p.price),
+          compare_at_price: Number(p.compare_at_price || 0),
+          rating: Number(p.rating || 4.8),
+          reviews_count: Number(p.reviews_count || 0),
+          badge: p.badge || '',
+          category: p.category || getProductCategory(p),
+          stock_status: p.stock_status || 'in_stock',
+          stock_qty: typeof p.stock_qty === 'number' ? p.stock_qty : 100,
+          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [FALLBACK_PRODUCT_IMG],
+        }));
+        setProducts(mapped);
+      } else {
+        loadFallbackCatalog();
+      }
     } catch {
-      // ignore
+      loadFallbackCatalog();
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchProductsFromDb();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const handleOpenEdit = (product: AdminProduct) => {
     setEditingProduct(product);
@@ -144,81 +173,128 @@ export const ProductsView: React.FC = () => {
     setFormComparePrice(product.compare_at_price || 0);
     setFormCategory(product.category);
     setFormStock(product.stock_status);
+    setFormStockQty(typeof product.stock_qty === 'number' ? product.stock_qty : 100);
     setFormBadge(product.badge || '');
     setFormRating(product.rating || 4.9);
     setFormReviewsCount(product.reviews_count || 120);
     setFormImage(product.images[0] || '');
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingProduct) {
-      const updated = products.map((p) =>
-        p.id === editingProduct.id
-          ? {
-              ...p,
-              title: formTitle.trim(),
-              price: Number(formPrice),
-              compare_at_price: Number(formComparePrice),
-              category: formCategory,
-              stock_status: formStock,
-              badge: formBadge.trim(),
-              rating: Number(formRating),
-              reviews_count: Number(formReviewsCount),
-              images: formImage.trim() ? [formImage.trim()] : p.images,
-            }
-          : p
-      );
-      saveProductsToStorage(updated);
-      setEditingProduct(null);
-    } else if (isAddingNew) {
-      const newId = Date.now();
-      const handle = formTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      const newProd: AdminProduct = {
-        id: newId,
-        title: formTitle.trim(),
-        handle: handle || `product-${newId}`,
-        price: Number(formPrice),
-        compare_at_price: Number(formComparePrice),
-        category: formCategory,
-        stock_status: formStock,
-        badge: formBadge.trim(),
-        rating: Number(formRating),
-        reviews_count: Number(formReviewsCount),
-        images: formImage.trim()
-          ? [formImage.trim()]
-          : ['https://www.gharsoaps.shop/cdn/shop/files/magicsoap_1.jpg?v=1785932125&width=400'],
-      };
-      saveProductsToStorage([newProd, ...products]);
-      setIsAddingNew(false);
+    if (!token) {
+      setStatusMessage('Admin authentication required to save changes.');
+      return;
     }
-  };
-
-  const handleDeleteProduct = (id: number | string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      const updated = products.filter((p) => p.id !== id);
-      saveProductsToStorage(updated);
-    }
-  };
-
-  // 1-Click stock status toggler
-  const handleToggleStock = (id: number | string) => {
-    const updated = products.map((p) => {
-      if (p.id === id) {
-        const nextStock: 'in_stock' | 'out_of_stock' =
-          p.stock_status === 'in_stock' ? 'out_of_stock' : 'in_stock';
-        return { ...p, stock_status: nextStock };
+    setIsSaving(true);
+    setStatusMessage(null);
+    try {
+      if (editingProduct) {
+        const res = await fetch('/api/products', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            id: editingProduct.id,
+            title: formTitle.trim(),
+            price: Number(formPrice),
+            compare_at_price: Number(formComparePrice),
+            category: formCategory,
+            stock_status: formStock,
+            stock_qty: Number(formStockQty),
+            badge: formBadge.trim(),
+            rating: Number(formRating),
+            reviews_count: Number(formReviewsCount),
+            image: formImage.trim() || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Update failed');
+        await fetchProductsFromDb();
+        setEditingProduct(null);
+        setStatusMessage('Product & inventory updated in database.');
+      } else if (isAddingNew) {
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: formTitle.trim(),
+            price: Number(formPrice),
+            compare_at_price: Number(formComparePrice),
+            category: formCategory,
+            stock_status: formStock,
+            stock_qty: Number(formStockQty),
+            badge: formBadge.trim(),
+            rating: Number(formRating),
+            reviews_count: Number(formReviewsCount),
+            image: formImage.trim() || FALLBACK_PRODUCT_IMG,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Create failed');
+        await fetchProductsFromDb();
+        setIsAddingNew(false);
+        setStatusMessage('New product created in database.');
       }
-      return p;
-    });
-    saveProductsToStorage(updated);
+    } catch (err: any) {
+      setStatusMessage(err?.message || 'Unable to save product changes.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleResetDefaults = () => {
-    if (confirm('Reset all product edits back to default factory catalog?')) {
-      localStorage.removeItem(STORAGE_KEY);
-      window.location.reload();
+  const handleDeleteProduct = async (id: number | string) => {
+    if (!token || !confirm('Are you sure you want to delete this product from the database?')) return;
+    try {
+      const res = await fetch(`/api/products?id=${encodeURIComponent(String(id))}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        setStatusMessage('Product deleted.');
+      }
+    } catch {
+      setStatusMessage('Failed to delete product.');
     }
+  };
+
+  // 1-Click stock status toggler synced to Supabase
+  const handleToggleStock = async (id: number | string) => {
+    const target = products.find((p) => p.id === id);
+    if (!target || !token) return;
+    const nextStock: 'in_stock' | 'out_of_stock' =
+      target.stock_status === 'in_stock' ? 'out_of_stock' : 'in_stock';
+    const nextQty = nextStock === 'in_stock' ? (target.stock_qty && target.stock_qty > 0 ? target.stock_qty : 100) : 0;
+
+    setProducts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, stock_status: nextStock, stock_qty: nextQty } : p))
+    );
+
+    try {
+      const res = await fetch('/api/products', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id, stock_status: nextStock, stock_qty: nextQty }),
+      });
+      if (!res.ok) {
+        await fetchProductsFromDb();
+      }
+    } catch {
+      await fetchProductsFromDb();
+    }
+  };
+
+  const handleRefreshCatalog = () => {
+    fetchProductsFromDb();
   };
 
   const categories = useMemo(
@@ -237,6 +313,15 @@ export const ProductsView: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-5">
+      {statusMessage && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center justify-between">
+          <span>{statusMessage}</span>
+          <button type="button" onClick={() => setStatusMessage(null)} className="text-emerald-700 hover:text-black">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Top Action Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-3xl border border-neutral-200/90 shadow-xs">
         <div>
@@ -244,19 +329,20 @@ export const ProductsView: React.FC = () => {
             Products Catalog & Inventory
           </h2>
           <p className="text-xs text-neutral-500">
-            {products.length} active products • Full Edit, Price, and Stock Controls
+            {products.length} synced DB products • Live Price & Stock Controls
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleResetDefaults}
-            title="Reset to default products"
+            onClick={handleRefreshCatalog}
+            disabled={isLoading}
+            title="Sync catalog from database"
             className="px-3 py-2 rounded-xl border border-neutral-200 text-xs font-bold text-neutral-600 hover:bg-neutral-50 flex items-center gap-1.5 transition"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reset</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Sync DB</span>
           </button>
 
           <button
@@ -268,6 +354,7 @@ export const ProductsView: React.FC = () => {
               setFormComparePrice(399);
               setFormCategory('Soaps');
               setFormStock('in_stock');
+              setFormStockQty(100);
               setFormBadge('New Launch');
               setFormRating(5.0);
               setFormReviewsCount(10);
@@ -402,10 +489,10 @@ export const ProductsView: React.FC = () => {
                         />
                         <span>
                           {product.stock_status === 'in_stock'
-                            ? 'In Stock'
+                            ? `In Stock (${product.stock_qty ?? 100})`
                             : product.stock_status === 'low_stock'
-                            ? 'Low Stock'
-                            : 'Out of Stock'}
+                            ? `Low Stock (${product.stock_qty ?? 0})`
+                            : 'Out of Stock (0)'}
                         </span>
                       </button>
                     </td>
@@ -540,8 +627,8 @@ export const ProductsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Category & Stock Status */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Category, Stock Status & Stock Qty */}
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-700 mb-1">
                     Category
@@ -549,13 +636,26 @@ export const ProductsView: React.FC = () => {
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-black bg-white"
+                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-black bg-white"
                   >
-                    <option value="Soaps">Soaps</option>
-                    <option value="Face Care">Face Care</option>
-                    <option value="Body Care">Body Care</option>
-                    <option value="Serums & Oils">Serums & Oils</option>
-                    <option value="Combos & Gift Sets">Combos & Gift Sets</option>
+                    {Array.from(
+                      new Set([
+                        formCategory,
+                        'Soaps',
+                        'Face Care',
+                        'Body Care',
+                        'Serums',
+                        'Serums & Oils',
+                        'Combos & Kits',
+                        'Combos & Gift Sets',
+                        'Body Tools',
+                        'Skincare',
+                      ].filter(Boolean))
+                    ).map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -564,13 +664,36 @@ export const ProductsView: React.FC = () => {
                   </label>
                   <select
                     value={formStock}
-                    onChange={(e) => setFormStock(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-black bg-white"
+                    onChange={(e) => {
+                      const val = e.target.value as 'in_stock' | 'low_stock' | 'out_of_stock';
+                      setFormStock(val);
+                      if (val === 'out_of_stock') setFormStockQty(0);
+                      else if (val === 'in_stock' && formStockQty <= 0) setFormStockQty(100);
+                      else if (val === 'low_stock' && (formStockQty <= 0 || formStockQty > 10)) setFormStockQty(5);
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-black bg-white"
                   >
                     <option value="in_stock">In Stock</option>
                     <option value="low_stock">Low Stock</option>
                     <option value="out_of_stock">Out of Stock</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-700 mb-1">
+                    Stock Qty
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formStockQty}
+                    onChange={(e) => {
+                      const q = Math.max(0, Number(e.target.value) || 0);
+                      setFormStockQty(q);
+                      setFormStock(q === 0 ? 'out_of_stock' : q <= 10 ? 'low_stock' : 'in_stock');
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-black font-bold"
+                  />
                 </div>
               </div>
 
@@ -632,10 +755,11 @@ export const ProductsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[#108474] hover:bg-[#0c6b5e] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md"
+                  disabled={isSaving}
+                  className="px-5 py-2.5 rounded-xl bg-[#108474] hover:bg-[#0c6b5e] disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>{editingProduct ? 'Update Product' : 'Add Product'}</span>
+                  <span>{isSaving ? 'Saving...' : editingProduct ? 'Update Product' : 'Add Product'}</span>
                 </button>
               </div>
             </form>

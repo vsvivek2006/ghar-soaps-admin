@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="icon" type="image/png" href="https://www.gharsoaps.shop/cdn/shop/files/PNG-Logo-Gharsoaps.png?v=1745295691" />
+        <link rel="icon" type="image/png" href="https://mlglwjaxvmcswesysipt.supabase.co/storage/v1/object/public/store-assets/catalog/b14de091ba-PNG-Logo-Gharsoaps.png" />
       </head>
       <body className="bg-[#f8f9fb] text-neutral-900 antialiased font-sans">
         <AdminProviders>{children}</AdminProviders>

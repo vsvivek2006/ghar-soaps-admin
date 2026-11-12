@@ -355,6 +355,16 @@ export const AppContent: React.FC = () => {
     showToast(`Exported ${orders.length} orders to CSV successfully!`);
   };
 
+  const pendingCount = useMemo(
+    () => orders.filter((o) => ['Confirmed', 'Processing'].includes(o.status)).length,
+    [orders]
+  );
+
+  const newInquiriesCount = useMemo(
+    () => inquiries.filter((i) => i.status === 'New').length,
+    [inquiries]
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-neutral-900 flex items-center justify-center p-4">
@@ -371,16 +381,6 @@ export const AppContent: React.FC = () => {
   if (!isAuthenticated) {
     return <LoginView />;
   }
-
-  const pendingCount = useMemo(
-    () => orders.filter((o) => ['Confirmed', 'Processing'].includes(o.status)).length,
-    [orders]
-  );
-
-  const newInquiriesCount = useMemo(
-    () => inquiries.filter((i) => i.status === 'New').length,
-    [inquiries]
-  );
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-row font-sans text-neutral-900 antialiased">
@@ -472,7 +472,7 @@ export const AppContent: React.FC = () => {
             />
           )}
 
-          {currentView === 'products' && <ProductsView />}
+          {currentView === 'products' && <ProductsView token={token} />}
 
           {currentView === 'settings' && <SettingsView />}
         </main>

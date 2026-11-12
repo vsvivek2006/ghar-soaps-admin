@@ -14,21 +14,38 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-function verifyAdminAuth(request: Request): boolean {
+async function verifyAdminAuth(request: Request): Promise<boolean> {
   const authHeader = request.headers.get('authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!token) return false;
+
   const expected = (process.env.ADMIN_SECRET_TOKEN || '').trim();
-  if (!expected || !token || token.length !== expected.length) return false;
-  try {
-    return crypto.timingSafeEqual(Buffer.from(token, 'utf-8'), Buffer.from(expected, 'utf-8'));
-  } catch {
-    return false;
+  if (expected && token.length === expected.length) {
+    try {
+      if (crypto.timingSafeEqual(Buffer.from(token, 'utf-8'), Buffer.from(expected, 'utf-8'))) {
+        return true;
+      }
+    } catch {
+      // continue to JWT verification
+    }
   }
+
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (!error && user?.id) {
+      return true;
+    }
+  } catch {
+    // Auth failed
+  }
+
+  return false;
 }
 
 // 1. GET: List all registered customers from Supabase Auth & correlate with Orders
 export async function GET(request: Request) {
-  if (!verifyAdminAuth(request)) {
+  if (!(await verifyAdminAuth(request))) {
     return NextResponse.json({ success: false, error: 'Unauthorized admin access.' }, { status: 401, headers: corsHeaders });
   }
 
@@ -96,7 +113,7 @@ export async function GET(request: Request) {
 
 // 2. PATCH: Update Customer Profile Details
 export async function PATCH(request: Request) {
-  if (!verifyAdminAuth(request)) {
+  if (!(await verifyAdminAuth(request))) {
     return NextResponse.json({ success: false, error: 'Unauthorized admin access.' }, { status: 401, headers: corsHeaders });
   }
 
@@ -146,7 +163,7 @@ export async function PATCH(request: Request) {
 
 // 3. DELETE: Remove or deactivate customer
 export async function DELETE(request: Request) {
-  if (!verifyAdminAuth(request)) {
+  if (!(await verifyAdminAuth(request))) {
     return NextResponse.json({ success: false, error: 'Unauthorized admin access.' }, { status: 401, headers: corsHeaders });
   }
 

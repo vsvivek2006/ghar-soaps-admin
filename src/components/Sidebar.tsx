@@ -77,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-5 sm:p-6 border-b border-neutral-100 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <img
-            src="https://www.gharsoaps.shop/cdn/shop/files/PNG-Logo-Gharsoaps.png?v=1745295691"
+            src="https://mlglwjaxvmcswesysipt.supabase.co/storage/v1/object/public/store-assets/catalog/b14de091ba-PNG-Logo-Gharsoaps.png"
             alt="Ghar Soaps"
             className="h-7 w-auto object-contain"
           />

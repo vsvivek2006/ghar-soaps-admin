@@ -55,7 +55,7 @@ export const LoginView: React.FC = () => {
         <div className="text-center space-y-2">
           <div className="w-16 h-16 rounded-2xl bg-neutral-900 text-white flex items-center justify-center mx-auto shadow-md">
             <img
-              src="https://www.gharsoaps.shop/cdn/shop/files/PNG-Logo-Gharsoaps.png?v=1745295691"
+              src="https://mlglwjaxvmcswesysipt.supabase.co/storage/v1/object/public/store-assets/catalog/b14de091ba-PNG-Logo-Gharsoaps.png"
               alt="Ghar Soaps"
               className="h-9 w-auto object-contain brightness-0 invert"
               onError={(e) => {
