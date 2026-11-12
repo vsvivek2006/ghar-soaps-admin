@@ -214,6 +214,7 @@ export async function GET(request: Request) {
           masked_key: keyId ? `${keyId.slice(0, 10)}...${keyId.slice(-4)}` : 'Not configured',
           is_live: keyId.startsWith('rzp_live_'),
           webhook_url: `${storefrontUrl}/api/payments/webhook`,
+          webhook_secret: webhookSecret || '',
           webhook_secret_configured: Boolean(webhookSecret),
           gateway_error: gatewayError,
         },
@@ -346,3 +347,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Action failed.', details: err?.message }, { status: 500 });
   }
 }
+

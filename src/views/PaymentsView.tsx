@@ -509,16 +509,18 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ token, onOpenOrder }
             <div className="min-w-0">
               <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mb-0.5">Webhook Secret</div>
               <div className="font-mono text-neutral-900 truncate select-all">
-                gharsoaps_live_wh_sec_2026_9f8e7d
+                {gatewayInfo?.webhook_secret || (gatewayInfo?.webhook_secret_configured ? 'Configured in .env / Vercel' : 'Not configured')}
               </div>
             </div>
-            <button
-              onClick={() => copyToClipboard('gharsoaps_live_wh_sec_2026_9f8e7d', 'Webhook Secret')}
-              className="p-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition shrink-0 cursor-pointer"
-              title="Copy Webhook Secret"
-            >
-              {copiedKey === 'Webhook Secret' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-            </button>
+            {gatewayInfo?.webhook_secret && (
+              <button
+                onClick={() => copyToClipboard(gatewayInfo.webhook_secret!, 'Webhook Secret')}
+                className="p-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition shrink-0 cursor-pointer"
+                title="Copy Webhook Secret"
+              >
+                {copiedKey === 'Webhook Secret' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1087,3 +1089,4 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ token, onOpenOrder }
     </div>
   );
 };
+

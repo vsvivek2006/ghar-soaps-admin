@@ -184,6 +184,7 @@ export interface GatewayInfo {
   masked_key: string;
   is_live: boolean;
   webhook_url: string;
+  webhook_secret?: string;
   webhook_secret_configured: boolean;
   gateway_error?: string | null;
 }

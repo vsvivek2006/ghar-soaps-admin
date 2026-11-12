@@ -34,9 +34,9 @@ export async function POST(request: Request) {
     // 2. Fallback: If legacy PIN / hex token provided
     if (pin) {
       const cleanPin = typeof pin === 'string' ? pin.trim() : '';
-      const expected = (process.env.ADMIN_SECRET_TOKEN || '27906e7eaf').trim();
+      const expected = (process.env.ADMIN_SECRET_TOKEN || '').trim();
 
-      if (!cleanPin || cleanPin.length !== expected.length) {
+      if (!expected || !cleanPin || cleanPin.length !== expected.length) {
         return NextResponse.json(
           { success: false, error: 'Invalid security passcode.' },
           { status: 401 }
