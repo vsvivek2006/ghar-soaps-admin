@@ -1,4 +1,6 @@
 export type OrderStatus =
+  | 'Pending Payment'
+  | 'Payment Failed'
   | 'Confirmed'
   | 'Processing'
   | 'Shipped'
@@ -42,6 +44,9 @@ export interface Order {
   discount: number;
   total: number;
   applied_coupon?: string;
+  payment_status?: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
   status: OrderStatus;
   tracking_number?: string;
   carrier?: string;
@@ -87,4 +92,19 @@ export interface EditableProduct {
   tags?: string[];
   images: string[];
   description?: string;
+}
+
+export type InquiryStatus = 'New' | 'In Progress' | 'Resolved';
+
+export interface ContactInquiry {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  order_id?: string;
+  message: string;
+  status: InquiryStatus;
+  admin_notes?: string;
+  created_at: string;
+  updated_at?: string;
 }

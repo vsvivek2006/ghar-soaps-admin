@@ -23,6 +23,10 @@ const VIEW_TITLES: Record<ViewType, { title: string; subtitle: string }> = {
     title: 'Customers & Subscribers',
     subtitle: 'Customer contacts, order history, and VIP newsletter leads.',
   },
+  contacts: {
+    title: 'Customer Inquiries',
+    subtitle: 'Messages and support tickets submitted from the Contact Us page.',
+  },
   products: {
     title: 'Product Catalog',
     subtitle: 'Browse all active products, pricing, and variant details.',

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { supabase } from './lib/supabase';
-import { Order, OrderStatus, Subscriber, RegisteredCustomer } from './types';
+import { Order, OrderStatus, Subscriber, RegisteredCustomer, ContactInquiry, InquiryStatus } from './types';
 import { exportOrdersToCSV } from './lib/utils';
 import { Sidebar, ViewType } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
@@ -14,6 +14,7 @@ import { LoginView } from './views/LoginView';
 import { DashboardView } from './views/DashboardView';
 import { OrdersView } from './views/OrdersView';
 import { CustomersView } from './views/CustomersView';
+import { ContactsView } from './views/ContactsView';
 import { ProductsView } from './views/ProductsView';
 import { SettingsView } from './views/SettingsView';
 
@@ -24,6 +25,7 @@ export const AppContent: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [registeredCustomers, setRegisteredCustomers] = useState<RegisteredCustomer[]>([]);
+  const [inquiries, setInquiries] = useState<ContactInquiry[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -98,9 +100,27 @@ export const AppContent: React.FC = () => {
     }
   };
 
+  // 3b. Fetch Contact Form Inquiries from Admin Next.js Server API (Authenticated)
+  const fetchContacts = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/contacts', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setInquiries(data.data as ContactInquiry[]);
+      }
+    } catch (err) {
+      console.error('Fetch contacts error:', err);
+    }
+  };
+
   const refreshAllData = async () => {
     setIsRefreshing(true);
-    await Promise.all([fetchOrders(), fetchCustomers(), fetchSubscribers()]);
+    await Promise.all([fetchOrders(), fetchCustomers(), fetchSubscribers(), fetchContacts()]);
     setIsRefreshing(false);
   };
 
@@ -266,6 +286,65 @@ export const AppContent: React.FC = () => {
     }
   };
 
+  // 7b. Update & Delete Contact Inquiries via Next.js Server API
+  const handleUpdateInquiry = async (
+    id: string,
+    status: InquiryStatus,
+    adminNotes?: string
+  ): Promise<boolean> => {
+    if (!token) return false;
+    try {
+      const res = await fetch('/api/contacts', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id, status, admin_notes: adminNotes }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || 'Failed to update inquiry', 'error');
+        return false;
+      }
+
+      setInquiries((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, ...data.inquiry } : item))
+      );
+      showToast(`Inquiry #${id} marked as ${status}.`);
+      return true;
+    } catch {
+      showToast('Error updating inquiry', 'error');
+      return false;
+    }
+  };
+
+  const handleDeleteInquiry = async (id: string): Promise<boolean> => {
+    if (!token) return false;
+    try {
+      const res = await fetch(`/api/contacts?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || 'Failed to delete inquiry', 'error');
+        return false;
+      }
+
+      setInquiries((prev) => prev.filter((item) => item.id !== id));
+      showToast(`Inquiry #${id} deleted.`);
+      return true;
+    } catch {
+      showToast('Error deleting inquiry', 'error');
+      return false;
+    }
+  };
+
   // 8. CSV Export for Orders
   const handleExportCSV = () => {
     if (orders.length === 0) {
@@ -297,6 +376,8 @@ export const AppContent: React.FC = () => {
     ['Confirmed', 'Processing'].includes(o.status)
   ).length;
 
+  const newInquiriesCount = inquiries.filter((i) => i.status === 'New').length;
+
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-row font-sans text-neutral-900 antialiased">
       {/* Toast notifications */}
@@ -312,6 +393,7 @@ export const AppContent: React.FC = () => {
           currentView={currentView}
           onChangeView={setCurrentView}
           pendingCount={pendingCount}
+          newInquiriesCount={newInquiriesCount}
         />
       </div>
 
@@ -327,6 +409,7 @@ export const AppContent: React.FC = () => {
               currentView={currentView}
               onChangeView={setCurrentView}
               pendingCount={pendingCount}
+              newInquiriesCount={newInquiriesCount}
               isOpen={true}
               onCloseMobile={() => setIsMobileSidebarOpen(false)}
               isMobileDrawer={true}
@@ -374,6 +457,14 @@ export const AppContent: React.FC = () => {
               onUpdateCustomer={handleUpdateCustomer}
               onDeleteCustomer={handleDeleteCustomer}
               onRefresh={fetchCustomers}
+            />
+          )}
+
+          {currentView === 'contacts' && (
+            <ContactsView
+              inquiries={inquiries}
+              onUpdateInquiry={handleUpdateInquiry}
+              onDeleteInquiry={handleDeleteInquiry}
             />
           )}
 

@@ -129,6 +129,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             </button>
             <button
               onClick={onClose}
+              aria-label="Close order modal"
               className="p-2 rounded-xl text-neutral-400 hover:text-black hover:bg-neutral-100 transition touch-manipulation min-h-[40px] min-w-[40px] flex items-center justify-center"
             >
               <X className="w-5 h-5" />
@@ -237,14 +238,24 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 <div className="text-neutral-600 pt-1">
                   {address}, {city}, {state} - <strong className="text-neutral-900">{pincode}</strong>
                 </div>
-                <div className="text-[11px] text-neutral-500 flex items-center gap-1.5 pt-0.5">
+                <div className="text-[11px] text-neutral-500 flex flex-wrap items-center gap-2 pt-0.5">
                   <CreditCard className="w-3.5 h-3.5 text-neutral-400" />
                   <span>
-                    Payment Method:{' '}
+                    Payment:{' '}
                     <strong className="uppercase text-neutral-900 font-bold">
-                      {order.payment_method || 'COD'}
+                      {order.payment_method || 'PREPAID'}
                     </strong>
                   </span>
+                  {order.payment_status && (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold uppercase text-[10px]">
+                      {order.payment_status}
+                    </span>
+                  )}
+                  {order.razorpay_payment_id && (
+                    <span className="font-mono text-[10px] text-neutral-500">
+                      Ref: {order.razorpay_payment_id}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -278,7 +289,14 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                         </div>
                       )}
                       <div className="min-w-0">
-                        <div className="font-bold text-neutral-900 truncate text-xs">{item.title}</div>
+                        <div className="font-bold text-neutral-900 truncate text-xs flex items-center gap-1.5">
+                          <span className="truncate">{item.title}</span>
+                          {Number(item.price) === 0 && (
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-extrabold uppercase shrink-0">
+                              Free Offer
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-neutral-500 mt-0.5">
                           {item.variant ? `${item.variant} • ` : ''}Qty: {item.quantity}
                         </div>
@@ -286,10 +304,10 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                     </div>
                     <div className="text-right shrink-0">
                       <div className="font-bold text-neutral-900">
-                        {formatPrice(item.price * item.quantity)}
+                        {Number(item.price) === 0 ? 'FREE' : formatPrice(item.price * item.quantity)}
                       </div>
                       <div className="text-[10px] text-neutral-400">
-                        {formatPrice(item.price)} each
+                        {Number(item.price) === 0 ? 'Bundle Gift' : `${formatPrice(item.price)} each`}
                       </div>
                     </div>
                   </div>

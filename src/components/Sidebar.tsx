@@ -9,15 +9,17 @@ import {
   ExternalLink,
   ShieldCheck,
   X,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export type ViewType = 'dashboard' | 'orders' | 'customers' | 'products' | 'settings';
+export type ViewType = 'dashboard' | 'orders' | 'customers' | 'contacts' | 'products' | 'settings';
 
 interface SidebarProps {
   currentView: ViewType;
   onChangeView: (view: ViewType) => void;
   pendingCount?: number;
+  newInquiriesCount?: number;
   isOpen?: boolean;
   onCloseMobile?: () => void;
   isMobileDrawer?: boolean;
@@ -27,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onChangeView,
   pendingCount = 0,
+  newInquiriesCount = 0,
   isOpen = false,
   onCloseMobile,
   isMobileDrawer = false,
@@ -49,6 +52,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'customers' as ViewType,
       label: 'Customers',
       icon: <Users className="w-4 h-4" />,
+    },
+    {
+      id: 'contacts' as ViewType,
+      label: 'Inquiries',
+      icon: <MessageSquare className="w-4 h-4" />,
+      badge: newInquiriesCount > 0 ? newInquiriesCount : undefined,
     },
     {
       id: 'products' as ViewType,
