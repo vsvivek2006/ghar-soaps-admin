@@ -16,12 +16,17 @@ import {
   Eye,
   ArrowRight,
   Phone,
+  UserCheck,
+  Tag,
+  Sparkles,
+  TrendingUp,
 } from 'lucide-react';
 import { ViewType } from '../components/Sidebar';
 
 interface DashboardViewProps {
   orders: Order[];
   subscribersCount: number;
+  registeredCustomersCount?: number;
   onOpenOrder: (order: Order) => void;
   onChangeView: (view: ViewType) => void;
   onExportCSV: () => void;
@@ -30,6 +35,7 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   orders,
   subscribersCount,
+  registeredCustomersCount = 0,
   onOpenOrder,
   onChangeView,
   onExportCSV,
@@ -41,16 +47,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const deliveredOrders = orders.filter((o) => o.status === 'Delivered').length;
   const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
-  const recentOrders = orders.slice(0, 5);
+  // Prepaid vs COD breakdown
+  const codOrders = orders.filter((o) => (o.payment_method || '').toLowerCase().includes('cod')).length;
+  const prepaidOrders = totalOrders - codOrders;
+
+  const recentOrders = orders.slice(0, 6);
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      {/* Metrics Row (2 cols on mobile, 4 on desktop) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* Metrics Row (Optimized 5-column / 2-column responsive layout) */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <MetricCard
           title="Total Sales"
           value={formatPrice(totalRevenue)}
-          subtitle="Gross sales received"
+          subtitle="Gross sales generated"
           icon={<DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />}
           accentColor="emerald"
         />
@@ -62,39 +72,71 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           accentColor="blue"
         />
         <MetricCard
+          title="Registered Users"
+          value={registeredCustomersCount}
+          subtitle="Live Supabase accounts"
+          icon={<UserCheck className="w-4 h-4 sm:w-5 sm:h-5" />}
+          accentColor="purple"
+        />
+        <MetricCard
           title="To Be Dispatched"
           value={pendingOrders}
-          subtitle="Waiting for packing"
+          subtitle="Awaiting packing"
           icon={<Clock className="w-4 h-4 sm:w-5 sm:h-5" />}
           accentColor="amber"
         />
         <MetricCard
           title="In Transit"
           value={shippedOrders}
-          subtitle="Out via courier"
+          subtitle="Out for delivery"
           icon={<Truck className="w-4 h-4 sm:w-5 sm:h-5" />}
           accentColor="purple"
         />
       </div>
 
-      {/* Fulfillment Funnel & Shortcuts */}
+      {/* Fulfillment Funnel & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
         {/* Fulfillment Pipeline */}
         <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-3xl border border-neutral-200/90 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs sm:text-sm font-extrabold text-neutral-900 uppercase tracking-wider font-heading">
-              Order Fulfillment Pipeline
-            </h2>
-            <span className="text-xs text-neutral-400 font-semibold">{totalOrders} Total Orders</span>
+            <div>
+              <h2 className="text-xs sm:text-sm font-extrabold text-neutral-900 uppercase tracking-wider font-heading">
+                Order Fulfillment Pipeline
+              </h2>
+              <p className="text-[11px] text-neutral-400">Live order lifecycle breakdown</p>
+            </div>
+            <span className="text-xs text-neutral-900 font-extrabold px-3 py-1 bg-neutral-100 rounded-full">
+              {totalOrders} Orders
+            </span>
           </div>
 
           <div className="space-y-3 pt-1">
             {[
-              { label: 'Confirmed (New)', count: orders.filter((o) => o.status === 'Confirmed').length, color: 'bg-blue-500' },
-              { label: 'Processing (Packing)', count: orders.filter((o) => o.status === 'Processing').length, color: 'bg-amber-500' },
-              { label: 'Shipped (In Transit)', count: orders.filter((o) => o.status === 'Shipped').length, color: 'bg-purple-500' },
-              { label: 'Out for Delivery', count: orders.filter((o) => o.status === 'Out for Delivery').length, color: 'bg-indigo-500' },
-              { label: 'Delivered', count: deliveredOrders, color: 'bg-emerald-500' },
+              {
+                label: 'Confirmed (New / Awaiting Review)',
+                count: orders.filter((o) => o.status === 'Confirmed').length,
+                color: 'bg-blue-500',
+              },
+              {
+                label: 'Processing (Packed in Eco Box)',
+                count: orders.filter((o) => o.status === 'Processing').length,
+                color: 'bg-amber-500',
+              },
+              {
+                label: 'Shipped (Handed to Courier Partner)',
+                count: orders.filter((o) => o.status === 'Shipped').length,
+                color: 'bg-purple-500',
+              },
+              {
+                label: 'Out for Delivery (Last Mile Delivery)',
+                count: orders.filter((o) => o.status === 'Out for Delivery').length,
+                color: 'bg-indigo-500',
+              },
+              {
+                label: 'Delivered (Completed Successfully)',
+                count: deliveredOrders,
+                color: 'bg-emerald-500',
+              },
             ].map((st, i) => {
               const pct = totalOrders > 0 ? Math.round((st.count / totalOrders) * 100) : 0;
               return (
@@ -108,58 +150,89 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full ${st.color} transition-all duration-500 rounded-full`}
-                      style={{ width: `${Math.max(pct, st.count > 0 ? 5 : 0)}%` }}
+                      style={{ width: `${Math.max(pct, st.count > 0 ? 4 : 0)}%` }}
                     />
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {/* Payment Split Banner */}
+          <div className="pt-3 border-t border-neutral-100 grid grid-cols-2 gap-3 text-xs">
+            <div className="p-3 bg-neutral-50 rounded-2xl border border-neutral-100">
+              <span className="text-[10px] uppercase font-bold text-neutral-400">Prepaid Orders</span>
+              <div className="text-base font-extrabold text-emerald-700 mt-0.5">
+                {prepaidOrders} ({totalOrders > 0 ? Math.round((prepaidOrders / totalOrders) * 100) : 0}%)
+              </div>
+            </div>
+            <div className="p-3 bg-neutral-50 rounded-2xl border border-neutral-100">
+              <span className="text-[10px] uppercase font-bold text-neutral-400">Cash on Delivery</span>
+              <div className="text-base font-extrabold text-neutral-800 mt-0.5">
+                {codOrders} ({totalOrders > 0 ? Math.round((codOrders / totalOrders) * 100) : 0}%)
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Quick Actions & VIP Leads */}
+        {/* Quick Admin Actions */}
         <div className="bg-white p-5 sm:p-6 rounded-3xl border border-neutral-200/90 shadow-xs flex flex-col justify-between space-y-4">
           <div>
             <h2 className="text-xs sm:text-sm font-extrabold text-neutral-900 uppercase tracking-wider font-heading">
-              Store Actions
+              Quick Management
             </h2>
-            <p className="text-xs text-neutral-400 mt-0.5">Quick management links</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Instant store controls</p>
 
             <div className="space-y-2 mt-3.5">
               <button
-                onClick={() => onChangeView('orders')}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/60 transition text-xs font-bold text-neutral-900 touch-manipulation min-h-[44px]"
+                type="button"
+                onClick={() => onChangeView('customers')}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/60 transition text-xs font-bold text-neutral-900"
               >
                 <div className="flex items-center gap-2.5">
-                  <Package className="w-4 h-4 text-neutral-700" />
-                  <span>View All Orders</span>
+                  <UserCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Track Registered Users</span>
+                </div>
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                  {registeredCustomersCount} Users
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onChangeView('products')}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/60 transition text-xs font-bold text-neutral-900"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Tag className="w-4 h-4 text-blue-600" />
+                  <span>Edit Products & Stock</span>
                 </div>
                 <ArrowRight className="w-4 h-4 text-neutral-400" />
               </button>
 
               <button
-                onClick={onExportCSV}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/60 transition text-xs font-bold text-neutral-900 touch-manipulation min-h-[44px]"
+                type="button"
+                onClick={() => onChangeView('orders')}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/60 transition text-xs font-bold text-neutral-900"
               >
                 <div className="flex items-center gap-2.5">
-                  <Download className="w-4 h-4 text-emerald-700" />
+                  <Package className="w-4 h-4 text-amber-600" />
+                  <span>Process Store Orders</span>
+                </div>
+                <ArrowRight className="w-4 h-4 text-neutral-400" />
+              </button>
+
+              <button
+                type="button"
+                onClick={onExportCSV}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/60 transition text-xs font-bold text-neutral-900"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Download className="w-4 h-4 text-neutral-700" />
                   <span>Export Orders CSV</span>
                 </div>
                 <ArrowRight className="w-4 h-4 text-neutral-400" />
               </button>
-
-              <a
-                href={process.env.NEXT_PUBLIC_STOREFRONT_URL || 'https://gharsoap.shop'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/60 transition text-xs font-bold text-neutral-900 touch-manipulation min-h-[44px]"
-              >
-                <div className="flex items-center gap-2.5">
-                  <ExternalLink className="w-4 h-4 text-blue-600" />
-                  <span>Visit Storefront</span>
-                </div>
-                <ArrowRight className="w-4 h-4 text-neutral-400" />
-              </a>
             </div>
           </div>
 
@@ -183,14 +256,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Recent Orders Container */}
+      {/* Recent Orders Table */}
       <div className="bg-white rounded-3xl border border-neutral-200/90 shadow-xs overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-neutral-100 flex items-center justify-between">
           <div>
             <h2 className="text-xs sm:text-sm font-extrabold text-neutral-900 font-heading uppercase tracking-wide">
-              Recent Orders
+              Recent Customer Orders
             </h2>
-            <p className="text-xs text-neutral-400 mt-0.5">Most recent incoming orders</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Real-time incoming customer transactions</p>
           </div>
           <button
             onClick={() => onChangeView('orders')}
@@ -202,95 +275,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {recentOrders.length === 0 ? (
           <div className="p-10 text-center text-neutral-400 text-xs">
-            No orders found yet. New store orders will appear here automatically.
+            No orders placed yet. Orders will appear here in real-time as customers checkout.
           </div>
         ) : (
-          <>
-            {/* Mobile Card List (Hidden on desktop) */}
-            <div className="block md:hidden divide-y divide-neutral-100">
-              {recentOrders.map((order) => (
-                <div key={order.id} className="p-4 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-neutral-900 text-xs">#{order.id}</span>
-                    <StatusBadge status={order.status} />
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <div>
-                      <div className="font-bold text-neutral-900">{order.customer_name}</div>
-                      <div className="text-[11px] text-neutral-400">{order.city}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-extrabold text-neutral-900">{formatPrice(order.total)}</div>
-                      <div className="text-[10px] text-neutral-400">{formatDate(order.created_at)}</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => onOpenOrder(order)}
-                    className="w-full bg-neutral-100 hover:bg-neutral-900 hover:text-white text-neutral-800 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 touch-manipulation min-h-[40px]"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>View & Manage</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop Table (Hidden on mobile) */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs text-neutral-600">
-                <thead className="bg-neutral-50/80 text-[11px] font-extrabold text-neutral-500 uppercase tracking-wider border-b border-neutral-200">
-                  <tr>
-                    <th className="py-3 px-5">Order ID</th>
-                    <th className="py-3 px-5">Customer</th>
-                    <th className="py-3 px-5">City</th>
-                    <th className="py-3 px-5">Items</th>
-                    <th className="py-3 px-5">Total</th>
-                    <th className="py-3 px-5">Status</th>
-                    <th className="py-3 px-5">Date</th>
-                    <th className="py-3 px-5 text-right">Action</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-neutral-600">
+              <thead className="bg-neutral-50/80 text-[11px] font-extrabold text-neutral-500 uppercase tracking-wider border-b border-neutral-200">
+                <tr>
+                  <th className="py-3.5 px-5">Order ID</th>
+                  <th className="py-3.5 px-5">Customer</th>
+                  <th className="py-3.5 px-5">Status</th>
+                  <th className="py-3.5 px-5">Total</th>
+                  <th className="py-3.5 px-5">Payment</th>
+                  <th className="py-3.5 px-5">Date</th>
+                  <th className="py-3.5 px-5 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {recentOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-neutral-50/70 transition">
+                    <td className="py-3.5 px-5 font-bold font-mono text-neutral-900">#{order.id}</td>
+                    <td className="py-3.5 px-5 font-bold text-neutral-900">{order.customer_name}</td>
+                    <td className="py-3.5 px-5">
+                      <StatusBadge status={order.status} />
+                    </td>
+                    <td className="py-3.5 px-5 font-extrabold text-neutral-900">{formatPrice(order.total)}</td>
+                    <td className="py-3.5 px-5 uppercase text-[10px] font-bold text-neutral-500">
+                      {order.payment_method || 'COD'}
+                    </td>
+                    <td className="py-3.5 px-5 text-neutral-500">{formatDate(order.created_at)}</td>
+                    <td className="py-3.5 px-5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onOpenOrder(order)}
+                        className="px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-xs transition"
+                      >
+                        Inspect
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {recentOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-neutral-50/60 transition">
-                      <td className="py-3.5 px-5 font-bold text-neutral-900 whitespace-nowrap">
-                        #{order.id}
-                      </td>
-                      <td className="py-3.5 px-5">
-                        <div className="font-bold text-neutral-900">{order.customer_name}</div>
-                        <div className="text-[11px] text-neutral-400">{order.phone}</div>
-                      </td>
-                      <td className="py-3.5 px-5 whitespace-nowrap">
-                        <div>{order.city}</div>
-                        <div className="text-[10px] text-neutral-400">{order.state}</div>
-                      </td>
-                      <td className="py-3.5 px-5 font-semibold text-neutral-700">
-                        {order.order_items?.length || 0} item(s)
-                      </td>
-                      <td className="py-3.5 px-5 font-extrabold text-neutral-900 whitespace-nowrap">
-                        {formatPrice(order.total)}
-                      </td>
-                      <td className="py-3.5 px-5 whitespace-nowrap">
-                        <StatusBadge status={order.status} />
-                      </td>
-                      <td className="py-3.5 px-5 text-neutral-400 whitespace-nowrap">
-                        {formatDate(order.created_at)}
-                      </td>
-                      <td className="py-3.5 px-5 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => onOpenOrder(order)}
-                          className="bg-neutral-100 hover:bg-neutral-900 hover:text-white text-neutral-800 px-3 py-1.5 rounded-xl font-bold text-[11px] transition inline-flex items-center gap-1 shadow-xs"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Manage</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

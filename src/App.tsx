@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { supabase } from './lib/supabase';
-import { Order, OrderStatus, Subscriber } from './types';
+import { Order, OrderStatus, Subscriber, RegisteredCustomer } from './types';
 import { exportOrdersToCSV } from './lib/utils';
 import { Sidebar, ViewType } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
@@ -23,6 +23,7 @@ export const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [registeredCustomers, setRegisteredCustomers] = useState<RegisteredCustomer[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -60,7 +61,25 @@ export const AppContent: React.FC = () => {
     }
   };
 
-  // 2. Fetch VIP Subscribers from Admin Next.js Server API (Authenticated)
+  // 2. Fetch Registered Customers from Supabase Auth & Analytics
+  const fetchCustomers = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/customers', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.customers)) {
+        setRegisteredCustomers(data.customers as RegisteredCustomer[]);
+      }
+    } catch (err) {
+      console.error('Fetch customers error:', err);
+    }
+  };
+
+  // 3. Fetch VIP Subscribers from Admin Next.js Server API (Authenticated)
   const fetchSubscribers = async () => {
     if (!token) return;
     try {
@@ -79,36 +98,56 @@ export const AppContent: React.FC = () => {
     }
   };
 
+  const refreshAllData = async () => {
+    setIsRefreshing(true);
+    await Promise.all([fetchOrders(), fetchCustomers(), fetchSubscribers()]);
+    setIsRefreshing(false);
+  };
+
   useEffect(() => {
     if (isAuthenticated && token) {
-      fetchOrders();
-      fetchSubscribers();
+      refreshAllData();
     }
   }, [isAuthenticated, token]);
 
-  // 3. Update Order Status & Courier in Next.js Server API (Authenticated)
+  // 4. Update Order Status, Courier, and Customer Details in Next.js Server API
   const handleUpdateStatus = async (
     orderId: string,
     newStatus: OrderStatus,
     carrier?: string,
     trackingNumber?: string,
-    note?: string
+    note?: string,
+    customerDetails?: {
+      customer_name?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      pincode?: string;
+    }
   ): Promise<boolean> => {
     if (!token) return false;
     try {
+      const payload: any = {
+        id: orderId,
+        status: newStatus,
+        carrier,
+        trackingNumber,
+        note,
+      };
+
+      if (customerDetails) {
+        Object.assign(payload, customerDetails);
+      }
+
       const res = await fetch('/api/orders', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          id: orderId,
-          status: newStatus,
-          carrier,
-          trackingNumber,
-          note,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -117,7 +156,7 @@ export const AppContent: React.FC = () => {
         return false;
       }
 
-      showToast(`Order #${orderId} updated to ${newStatus}!`);
+      showToast(`Order #${orderId} updated successfully!`);
       await fetchOrders();
 
       if (activeOrder && activeOrder.id === orderId) {
@@ -128,6 +167,7 @@ export const AppContent: React.FC = () => {
                 status: newStatus,
                 carrier: carrier || prev.carrier,
                 tracking_number: trackingNumber || prev.tracking_number,
+                ...(customerDetails || {}),
               }
             : null
         );
@@ -140,7 +180,67 @@ export const AppContent: React.FC = () => {
     }
   };
 
-  // 4. Delete Order via Next.js Server API (Authenticated)
+  // 5. Update Customer Details via Server API
+  const handleUpdateCustomer = async (
+    userId: string,
+    customerData: { full_name: string; phone?: string; email?: string }
+  ): Promise<boolean> => {
+    if (!token) return false;
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          userId,
+          ...customerData,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || 'Failed to update customer', 'error');
+        return false;
+      }
+
+      showToast('Customer profile updated successfully!');
+      await fetchCustomers();
+      return true;
+    } catch {
+      showToast('Error updating customer profile', 'error');
+      return false;
+    }
+  };
+
+  // 6. Delete Customer via Server API
+  const handleDeleteCustomer = async (userId: string): Promise<boolean> => {
+    if (!token) return false;
+    try {
+      const res = await fetch(`/api/customers?userId=${userId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || 'Failed to delete customer', 'error');
+        return false;
+      }
+
+      showToast('Customer account removed.');
+      await fetchCustomers();
+      return true;
+    } catch {
+      showToast('Error deleting customer', 'error');
+      return false;
+    }
+  };
+
+  // 7. Delete Order via Next.js Server API
   const handleDeleteOrder = async (orderId: string): Promise<boolean> => {
     if (!token) return false;
     try {
@@ -158,31 +258,32 @@ export const AppContent: React.FC = () => {
       }
 
       showToast(`Order #${orderId} deleted permanently.`);
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
-      if (activeOrder?.id === orderId) {
-        setActiveOrder(null);
-      }
+      await fetchOrders();
       return true;
     } catch (err: any) {
-      showToast('Network error deleting order', 'error');
+      showToast('Error deleting order', 'error');
       return false;
     }
   };
 
-  // 5. Export to CSV
+  // 8. CSV Export for Orders
   const handleExportCSV = () => {
+    if (orders.length === 0) {
+      showToast('No orders available to export', 'error');
+      return;
+    }
     exportOrdersToCSV(orders);
-    showToast('Orders exported to CSV successfully!');
+    showToast(`Exported ${orders.length} orders to CSV successfully!`);
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#f7f6f2] flex flex-col items-center justify-center p-4">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-3 border-neutral-300 border-t-neutral-900 rounded-full animate-spin" />
-          <span className="text-xs font-bold text-neutral-600 uppercase tracking-wider">
-            Loading Admin Session...
-          </span>
+      <div className="min-h-screen bg-neutral-900 flex items-center justify-center p-4">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="text-white text-xs font-semibold uppercase tracking-wider">
+            Loading Ghar Soaps Admin...
+          </div>
         </div>
       </div>
     );
@@ -192,18 +293,20 @@ export const AppContent: React.FC = () => {
     return <LoginView />;
   }
 
-  const pendingCount = orders.filter((o) => ['Confirmed', 'Processing'].includes(o.status)).length;
+  const pendingCount = orders.filter((o) =>
+    ['Confirmed', 'Processing'].includes(o.status)
+  ).length;
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] flex flex-row font-sans">
-      {/* Toast Notification */}
+    <div className="min-h-screen bg-neutral-100 flex flex-row font-sans text-neutral-900 antialiased">
+      {/* Toast notifications */}
       <Toast
         message={toastMessage}
         type={toastType}
         onClose={() => setToastMessage(null)}
       />
 
-      {/* 1. DESKTOP SIDEBAR: Standard flex child in document flow - Always visible on desktop (md:flex, >= 768px) */}
+      {/* 1. DESKTOP SIDEBAR */}
       <div className="hidden md:flex w-64 shrink-0 flex-col sticky top-0 h-screen border-r border-neutral-200 bg-white z-20">
         <Sidebar
           currentView={currentView}
@@ -212,7 +315,7 @@ export const AppContent: React.FC = () => {
         />
       </div>
 
-      {/* 2. MOBILE DRAWER: Modal overlay on small screens (< 768px) */}
+      {/* 2. MOBILE DRAWER */}
       {isMobileSidebarOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div
@@ -232,12 +335,12 @@ export const AppContent: React.FC = () => {
         </div>
       )}
 
-      {/* 3. MAIN CONTENT CONTAINER: Natural flex-1 sibling */}
+      {/* 3. MAIN CONTENT CONTAINER */}
       <div className="flex-1 flex flex-col min-w-0">
         <Navbar
           currentView={currentView}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
-          onRefresh={fetchOrders}
+          onRefresh={refreshAllData}
           isRefreshing={isRefreshing}
           ordersCount={orders.length}
         />
@@ -247,6 +350,7 @@ export const AppContent: React.FC = () => {
             <DashboardView
               orders={orders}
               subscribersCount={subscribers.length}
+              registeredCustomersCount={registeredCustomers.length}
               onOpenOrder={setActiveOrder}
               onChangeView={setCurrentView}
               onExportCSV={handleExportCSV}
@@ -266,6 +370,10 @@ export const AppContent: React.FC = () => {
             <CustomersView
               orders={orders}
               subscribers={subscribers}
+              registeredCustomers={registeredCustomers}
+              onUpdateCustomer={handleUpdateCustomer}
+              onDeleteCustomer={handleDeleteCustomer}
+              onRefresh={fetchCustomers}
             />
           )}
 

@@ -14,6 +14,9 @@ import {
   Trash2,
   CheckCircle2,
   RefreshCw,
+  Edit3,
+  MapPin,
+  User,
 } from 'lucide-react';
 
 interface OrderDetailModalProps {
@@ -24,7 +27,16 @@ interface OrderDetailModalProps {
     newStatus: OrderStatus,
     carrier?: string,
     trackingNumber?: string,
-    note?: string
+    note?: string,
+    customerDetails?: {
+      customer_name?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      pincode?: string;
+    }
   ) => Promise<boolean>;
   onDeleteOrder: (orderId: string) => Promise<boolean>;
 }
@@ -41,13 +53,32 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const [carrier, setCarrier] = useState(order.carrier || 'BlueDart Express Air');
   const [trackingNumber, setTrackingNumber] = useState(order.tracking_number || '');
   const [note, setNote] = useState('');
+
+  // Editable customer info
+  const [showAddressEdit, setShowAddressEdit] = useState(false);
+  const [customerName, setCustomerName] = useState(order.customer_name);
+  const [phone, setPhone] = useState(order.phone);
+  const [email, setEmail] = useState(order.email || '');
+  const [address, setAddress] = useState(order.address);
+  const [city, setCity] = useState(order.city);
+  const [state, setState] = useState(order.state);
+  const [pincode, setPincode] = useState(order.pincode);
+
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    await onUpdateStatus(order.id, status, carrier, trackingNumber, note);
+    await onUpdateStatus(order.id, status, carrier, trackingNumber, note, {
+      customer_name: customerName,
+      phone,
+      email,
+      address,
+      city,
+      state,
+      pincode,
+    });
     setIsSaving(false);
   };
 
@@ -60,9 +91,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
     }
   };
 
-  const cleanPhone = order.phone.replace(/\D/g, '').slice(-10);
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
   const whatsappUrl = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
-    `Hello ${order.customer_name}, this is Ghar Soaps regarding your order #${order.id}. Current status: ${order.status}. Courier: ${carrier} (Tracking: ${trackingNumber || 'In Packing'}).`
+    `Hello ${customerName}, this is Ghar Soaps regarding your order #${order.id}. Current status: ${status}. Courier: ${carrier} (Tracking: ${trackingNumber || 'In Packing'}).`
   )}`;
 
   return (
@@ -79,7 +110,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 <h3 className="text-base sm:text-lg font-extrabold text-neutral-900 font-heading">
                   Order #{order.id}
                 </h3>
-                <StatusBadge status={order.status} />
+                <StatusBadge status={status} />
               </div>
               <div className="text-[11px] text-neutral-400 mt-0.5">
                 Placed on {formatDateTime(order.created_at)}
@@ -106,57 +137,117 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 text-xs">
-          {/* Customer & Address Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-4 sm:p-5 rounded-2xl border border-neutral-200">
-            {/* Customer Details */}
-            <div className="space-y-2.5">
-              <div className="text-[10px] font-extrabold text-neutral-400 uppercase tracking-wider">
-                Customer & Contact
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs">
+          {/* Customer & Delivery Card */}
+          <div className="bg-neutral-50/70 p-4 sm:p-5 rounded-2xl border border-neutral-200/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-extrabold text-neutral-900 uppercase tracking-wide">
+                <User className="w-4 h-4 text-[#108474]" />
+                <span>Customer & Delivery Details</span>
               </div>
-              <div>
-                <div className="font-bold text-neutral-900 text-sm">{order.customer_name}</div>
-                {order.email && <div className="text-neutral-500 mt-0.5 text-xs">{order.email}</div>}
-              </div>
-
-              {/* Call & WhatsApp actions */}
-              <div className="flex items-center gap-2 pt-1">
-                <a
-                  href={`tel:+91${cleanPhone}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-neutral-300 font-bold text-neutral-700 hover:border-black transition touch-manipulation min-h-[38px]"
-                >
-                  <Phone className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Call</span>
-                </a>
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition touch-manipulation min-h-[38px]"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span>WhatsApp</span>
-                </a>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddressEdit(!showAddressEdit)}
+                className="text-xs font-bold text-[#108474] hover:underline flex items-center gap-1"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>{showAddressEdit ? 'Done Editing' : 'Edit Address'}</span>
+              </button>
             </div>
 
-            {/* Shipping Destination */}
-            <div className="space-y-2 border-t sm:border-t-0 sm:border-l border-neutral-200 pt-3 sm:pt-0 sm:pl-4">
-              <div className="text-[10px] font-extrabold text-neutral-400 uppercase tracking-wider">
-                Delivery Address
+            {showAddressEdit ? (
+              <div className="space-y-3 pt-2 border-t border-neutral-200">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Customer Name</label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full p-2 border rounded-xl text-xs bg-white font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Phone Number</label>
+                    <input
+                      type="text"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full p-2 border rounded-xl text-xs bg-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-neutral-500 uppercase">Street Address</label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full p-2 border rounded-xl text-xs bg-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-500 uppercase">City</label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full p-2 border rounded-xl text-xs bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-500 uppercase">State</label>
+                    <input
+                      type="text"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      className="w-full p-2 border rounded-xl text-xs bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Pincode</label>
+                    <input
+                      type="text"
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value)}
+                      className="w-full p-2 border rounded-xl text-xs bg-white font-mono"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="text-neutral-700 leading-relaxed font-medium">
-                {order.address}
-                <br />
-                {order.city}, {order.state} - <strong className="text-black">{order.pincode}</strong>
+            ) : (
+              <div className="space-y-1.5 text-neutral-700">
+                <div className="font-bold text-sm text-neutral-900">{customerName}</div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="font-mono text-neutral-800 font-bold">+91 {cleanPhone}</span>
+                  {email && <span className="text-neutral-500">{email}</span>}
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md hover:bg-emerald-100"
+                  >
+                    <MessageCircle className="w-3 h-3" />
+                    <span>WhatsApp Customer</span>
+                  </a>
+                </div>
+                <div className="text-neutral-600 pt-1">
+                  {address}, {city}, {state} - <strong className="text-neutral-900">{pincode}</strong>
+                </div>
+                <div className="text-[11px] text-neutral-500 flex items-center gap-1.5 pt-0.5">
+                  <CreditCard className="w-3.5 h-3.5 text-neutral-400" />
+                  <span>
+                    Payment Method:{' '}
+                    <strong className="uppercase text-neutral-900 font-bold">
+                      {order.payment_method || 'COD'}
+                    </strong>
+                  </span>
+                </div>
               </div>
-              <div className="text-[11px] text-neutral-600 pt-1 flex items-center gap-1.5">
-                <CreditCard className="w-3.5 h-3.5 text-neutral-500" />
-                <span>
-                  Payment: <strong className="uppercase text-black font-bold">{order.payment_method}</strong>
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Ordered Items List */}
@@ -208,7 +299,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               )}
             </div>
 
-            {/* Totals */}
+            {/* Totals Summary */}
             <div className="bg-neutral-50 p-3.5 rounded-2xl border border-neutral-200 space-y-1.5">
               <div className="flex justify-between text-neutral-600">
                 <span>Subtotal:</span>
@@ -230,8 +321,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
           {/* Update Order & Courier Tracking Form */}
           <form onSubmit={handleSave} className="border-t border-neutral-200 pt-5 space-y-4">
             <div className="flex items-center gap-2 text-xs font-bold text-neutral-900 uppercase tracking-wide">
-              <Truck className="w-4 h-4 text-emerald-700" />
-              <span>Update Shipping & Status</span>
+              <Truck className="w-4 h-4 text-[#108474]" />
+              <span>Update Order Status & Dispatch Info</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -261,83 +352,65 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   type="text"
                   value={carrier}
                   onChange={(e) => setCarrier(e.target.value)}
-                  placeholder="e.g. BlueDart Express / Delhivery"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 font-medium text-neutral-900 focus:outline-none focus:border-black text-xs"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold text-neutral-600 mb-1">
-                  Tracking Number (AWB):
-                </label>
-                <input
-                  type="text"
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  placeholder="e.g. AWB849201948"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 font-medium text-neutral-900 focus:outline-none focus:border-black text-xs"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold text-neutral-600 mb-1">
-                  Status Note (Optional):
-                </label>
-                <input
-                  type="text"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="e.g. Package dispatched from Mumbai hub."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 font-medium text-neutral-900 focus:outline-none focus:border-black text-xs"
+                  placeholder="e.g. BlueDart Express, Delhivery"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-black font-medium"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div>
+              <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                Airway Bill / Tracking Number (AWB):
+              </label>
+              <input
+                type="text"
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value)}
+                placeholder="e.g. BD-892182910"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-black font-mono font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                Dispatch Note or Milestone Description:
+              </label>
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="e.g. Handed to pickup executive at dock 2."
+                className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-black"
+              />
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-100 text-xs font-bold transition"
+              >
+                Close
+              </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="w-full sm:w-auto bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-sm touch-manipulation min-h-[44px]"
+                className="px-5 py-2.5 rounded-xl bg-[#108474] hover:bg-[#0c6b5e] text-white text-xs font-bold shadow-md transition disabled:opacity-50 flex items-center gap-1.5"
               >
                 {isSaving ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Saving Changes...</span>
+                    <span>Saving...</span>
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Save & Update Order</span>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Save Changes</span>
                   </>
                 )}
               </button>
             </div>
           </form>
-
-          {/* Tracking History Milestones */}
-          {order.order_tracking_events && order.order_tracking_events.length > 0 && (
-            <div className="border-t border-neutral-200 pt-5 space-y-3">
-              <div className="text-xs font-bold text-neutral-900 uppercase tracking-wide">
-                Tracking History
-              </div>
-              <div className="space-y-3 pl-1">
-                {order.order_tracking_events.map((evt, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0 ring-4 ring-emerald-50" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-neutral-900 text-xs">{evt.title}</div>
-                      {evt.description && (
-                        <div className="text-[11px] text-neutral-600 mt-0.5">{evt.description}</div>
-                      )}
-                      <div className="text-[10px] text-neutral-400 mt-0.5">
-                        {evt.location} • {formatDateTime(evt.occurred_at)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -58,12 +58,33 @@ export interface Subscriber {
   created_at: string;
 }
 
-export interface AdminStats {
-  totalRevenue: number;
-  totalOrders: number;
-  pendingOrders: number;
-  shippedOrders: number;
-  deliveredOrders: number;
-  averageOrderValue: number;
+export interface RegisteredCustomer {
+  id: string;
+  full_name: string;
+  email?: string;
+  phone?: string;
+  created_at: string;
+  last_sign_in_at?: string;
+  email_confirmed: boolean;
+  totalSpent: number;
+  orderCount: number;
+  lastOrderDate?: string;
+  role?: string;
+  orders?: Order[];
 }
 
+export interface EditableProduct {
+  id: number | string;
+  title: string;
+  handle: string;
+  price: number;
+  compare_at_price?: number;
+  rating?: number;
+  reviews_count?: number;
+  badge?: string;
+  category: string;
+  stock_status: 'in_stock' | 'low_stock' | 'out_of_stock';
+  tags?: string[];
+  images: string[];
+  description?: string;
+}

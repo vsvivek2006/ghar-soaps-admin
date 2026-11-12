@@ -107,6 +107,15 @@ export async function PATCH(request: Request) {
     if (safeCarrier) updates.carrier = safeCarrier;
     if (safeTracking) updates.tracking_number = safeTracking;
 
+    // Support updating customer address and contact details
+    if (body.customer_name) updates.customer_name = cleanInput(body.customer_name, 100);
+    if (body.phone) updates.phone = cleanInput(body.phone, 15).replace(/\D/g, '').slice(-10);
+    if (body.email) updates.email = cleanInput(body.email, 120).toLowerCase();
+    if (body.address) updates.address = cleanInput(body.address, 300);
+    if (body.city) updates.city = cleanInput(body.city, 80);
+    if (body.state) updates.state = cleanInput(body.state, 80);
+    if (body.pincode) updates.pincode = cleanInput(body.pincode, 10);
+
     const { data: updatedOrder, error: updateError } = await supabaseAdmin
       .from('orders')
       .update(updates)
