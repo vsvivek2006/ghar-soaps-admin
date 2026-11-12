@@ -108,3 +108,83 @@ export interface ContactInquiry {
   created_at: string;
   updated_at?: string;
 }
+
+export interface RazorpayLivePayment {
+  id: string;
+  entity: string;
+  amount: number;
+  currency: string;
+  status: 'captured' | 'authorized' | 'failed' | 'refunded';
+  order_id: string | null;
+  invoice_id: string | null;
+  method: string;
+  amount_refunded: number;
+  refund_status: string | null;
+  captured: boolean;
+  description: string | null;
+  bank?: string | null;
+  wallet?: string | null;
+  vpa?: string | null;
+  card?: {
+    network?: string;
+    last4?: string;
+    type?: string;
+    issuer?: string;
+  } | null;
+  email?: string | null;
+  contact?: string | null;
+  error_code?: string | null;
+  error_description?: string | null;
+  error_reason?: string | null;
+  created_at: string;
+  order?: {
+    id: string;
+    tracking_number?: string;
+    customer_name: string;
+    phone: string;
+    status: string;
+    payment_status: string;
+  } | null;
+}
+
+export interface PaymentWebhookEvent {
+  event_id: string;
+  event_type: string;
+  razorpay_order_id?: string | null;
+  razorpay_payment_id?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  status?: string | null;
+  method?: string | null;
+  bank?: string | null;
+  wallet?: string | null;
+  vpa?: string | null;
+  email?: string | null;
+  contact?: string | null;
+  error_code?: string | null;
+  error_description?: string | null;
+  error_reason?: string | null;
+  payload?: any;
+  processed_at: string;
+}
+
+export interface PaymentDashboardStats {
+  total_volume: number;
+  total_captured_count: number;
+  failed_count: number;
+  refunded_count: number;
+  refunded_volume: number;
+  success_rate: number;
+  total_attempts: number;
+  method_breakdown: Record<string, number>;
+}
+
+export interface GatewayInfo {
+  key_id: string;
+  masked_key: string;
+  is_live: boolean;
+  webhook_url: string;
+  webhook_secret_configured: boolean;
+  gateway_error?: string | null;
+}
+

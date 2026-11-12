@@ -19,6 +19,10 @@ const VIEW_TITLES: Record<ViewType, { title: string; subtitle: string }> = {
     title: 'Orders',
     subtitle: 'Manage incoming orders, update shipping status, and view customer details.',
   },
+  payments: {
+    title: 'Razorpay Live Payments',
+    subtitle: 'Real-time gateway tracking, captured transactions, and webhook audit.',
+  },
   customers: {
     title: 'Customers & Subscribers',
     subtitle: 'Customer contacts, order history, and VIP newsletter leads.',

@@ -13,6 +13,7 @@ import { Toast } from './components/Toast';
 import { LoginView } from './views/LoginView';
 import { DashboardView } from './views/DashboardView';
 import { OrdersView } from './views/OrdersView';
+import { PaymentsView } from './views/PaymentsView';
 import { CustomersView } from './views/CustomersView';
 import { ContactsView } from './views/ContactsView';
 import { ProductsView } from './views/ProductsView';
@@ -451,6 +452,10 @@ export const AppContent: React.FC = () => {
               onDeleteOrder={handleDeleteOrder}
               onExportCSV={handleExportCSV}
             />
+          )}
+
+          {currentView === 'payments' && (
+            <PaymentsView token={token} onOpenOrder={setActiveOrder} />
           )}
 
           {currentView === 'customers' && (

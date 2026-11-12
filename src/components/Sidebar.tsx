@@ -10,10 +10,11 @@ import {
   ShieldCheck,
   X,
   MessageSquare,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export type ViewType = 'dashboard' | 'orders' | 'customers' | 'contacts' | 'products' | 'settings';
+export type ViewType = 'dashboard' | 'orders' | 'payments' | 'customers' | 'contacts' | 'products' | 'settings';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -47,6 +48,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Orders',
       icon: <ShoppingBag className="w-4 h-4" />,
       badge: pendingCount > 0 ? pendingCount : undefined,
+    },
+    {
+      id: 'payments' as ViewType,
+      label: 'Live Payments',
+      icon: <CreditCard className="w-4 h-4" />,
     },
     {
       id: 'customers' as ViewType,
