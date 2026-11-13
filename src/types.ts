@@ -147,6 +147,29 @@ export interface RazorpayLivePayment {
   } | null;
 }
 
+export interface RazorpayGatewayOrder {
+  id: string;
+  entity: string;
+  amount: number;
+  amount_paid: number;
+  amount_due: number;
+  currency: string;
+  receipt: string;
+  status: 'created' | 'attempted' | 'paid';
+  attempts: number;
+  notes?: Record<string, string>;
+  created_at: string;
+  order?: {
+    id: string;
+    tracking_number?: string;
+    customer_name: string;
+    phone: string;
+    email?: string;
+    status: string;
+    payment_status: string;
+  } | null;
+}
+
 export interface PaymentWebhookEvent {
   event_id: string;
   event_type: string;
@@ -176,7 +199,12 @@ export interface PaymentDashboardStats {
   refunded_volume: number;
   success_rate: number;
   total_attempts: number;
+  total_orders_created: number;
+  orders_created_volume: number;
+  estimated_fees: number;
+  net_settlement_volume: number;
   method_breakdown: Record<string, number>;
+  failure_reasons_breakdown?: Record<string, number>;
 }
 
 export interface GatewayInfo {

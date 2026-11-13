@@ -4,6 +4,14 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
+// In-memory micro-cache (6 seconds TTL) for ultra-fast response during high-frequency admin polling
+interface CacheEntry {
+  timestamp: number;
+  data: any;
+}
+let memoryCache: CacheEntry | null = null;
+const CACHE_TTL_MS = 6000;
+
 async function verifyAdminAuth(request: Request): Promise<boolean> {
   const authHeader = request.headers.get('authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
@@ -40,6 +48,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get('refresh') === 'true';
+
+    // Serve from micro-cache if warm and fresh
+    const now = Date.now();
+    if (!forceRefresh && memoryCache && now - memoryCache.timestamp < CACHE_TTL_MS) {
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        data: memoryCache.data,
+      });
+    }
+
     const keyId = (process.env.RAZORPAY_KEY_ID || '').trim();
     const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
     const webhookSecret = (process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
@@ -47,34 +68,44 @@ export async function GET(request: Request) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
-    // 1. Fetch live payment transactions directly from Razorpay API
     let razorpayPayments: any[] = [];
+    let razorpayOrders: any[] = [];
     let gatewayError: string | null = null;
 
     if (keyId && keySecret) {
-      try {
-        const basicAuth = Buffer.from(`${keyId}:${keySecret}`, 'utf8').toString('base64');
-        const rzpRes = await fetch('https://api.razorpay.com/v1/payments?count=100&expand[]=card', {
-          headers: {
-            Authorization: `Basic ${basicAuth}`,
-          },
-          signal: AbortSignal.timeout(10000),
-          cache: 'no-store',
-        });
+      const basicAuth = Buffer.from(`${keyId}:${keySecret}`, 'utf8').toString('base64');
+      const authHeader = { Authorization: `Basic ${basicAuth}` };
 
-        if (rzpRes.ok) {
-          const rzpData = await rzpRes.json();
-          razorpayPayments = Array.isArray(rzpData?.items) ? rzpData.items : [];
-        } else {
-          gatewayError = `Razorpay API HTTP ${rzpRes.status}`;
-        }
-      } catch (err: any) {
-        gatewayError = err?.message || 'Failed connecting to Razorpay API';
+      // Parallel fetch of Payments and Orders from Razorpay Gateway
+      const [paymentsResult, ordersResult] = await Promise.allSettled([
+        fetch('https://api.razorpay.com/v1/payments?count=100&expand[]=card', {
+          headers: authHeader,
+          signal: AbortSignal.timeout(9000),
+          cache: 'no-store',
+        }),
+        fetch('https://api.razorpay.com/v1/orders?count=100', {
+          headers: authHeader,
+          signal: AbortSignal.timeout(9000),
+          cache: 'no-store',
+        }),
+      ]);
+
+      if (paymentsResult.status === 'fulfilled' && paymentsResult.value.ok) {
+        const pJson = await paymentsResult.value.json();
+        razorpayPayments = Array.isArray(pJson?.items) ? pJson.items : [];
+      } else {
+        const reason = paymentsResult.status === 'rejected' ? paymentsResult.reason?.message : 'HTTP error';
+        gatewayError = `Razorpay Payments API: ${reason}`;
+      }
+
+      if (ordersResult.status === 'fulfilled' && ordersResult.value.ok) {
+        const oJson = await ordersResult.value.json();
+        razorpayOrders = Array.isArray(oJson?.items) ? oJson.items : [];
       }
     }
 
     // 2. Fetch recorded webhook events from Supabase audit table
-    const { data: dbEvents, error: dbEventsError } = await supabaseAdmin
+    const { data: dbEvents } = await supabaseAdmin
       .from('payment_events')
       .select('*')
       .order('processed_at', { ascending: false })
@@ -91,12 +122,16 @@ export async function GET(request: Request) {
       if (p.id) rzpPaymentIds.add(String(p.id));
     });
 
+    razorpayOrders.forEach((o) => {
+      if (o.id) rzpOrderIds.add(String(o.id));
+    });
+
     paymentEvents.forEach((ev: any) => {
       if (ev.razorpay_order_id) rzpOrderIds.add(String(ev.razorpay_order_id));
       if (ev.razorpay_payment_id) rzpPaymentIds.add(String(ev.razorpay_payment_id));
     });
 
-    // 4. Fetch matching orders
+    // 4. Fetch matching store orders
     const matchedOrdersMap = new Map<string, any>();
     if (rzpOrderIds.size > 0 || rzpPaymentIds.size > 0) {
       const orderIdList = Array.from(rzpOrderIds);
@@ -129,7 +164,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // 5. Build unified and enriched payments list
+    // 5. Build enriched payments list
     const enrichedPayments = razorpayPayments.map((p) => {
       const matchedOrder =
         (p.order_id ? matchedOrdersMap.get(p.order_id) : null) ||
@@ -151,26 +186,60 @@ export async function GET(request: Request) {
         bank: p.bank,
         wallet: p.wallet,
         vpa: p.vpa,
-        card: p.card ? {
-          network: p.card.network,
-          last4: p.card.last4,
-          type: p.card.type,
-          issuer: p.card.issuer,
-        } : null,
+        card: p.card
+          ? {
+              network: p.card.network,
+              last4: p.card.last4,
+              type: p.card.type,
+              issuer: p.card.issuer,
+            }
+          : null,
         email: p.email,
         contact: p.contact,
         error_code: p.error_code,
         error_description: p.error_description,
         error_reason: p.error_reason || p.error_source,
         created_at: p.created_at ? new Date(p.created_at * 1000).toISOString() : new Date().toISOString(),
-        order: matchedOrder ? {
-          id: matchedOrder.id,
-          tracking_number: matchedOrder.tracking_number,
-          customer_name: matchedOrder.customer_name,
-          phone: matchedOrder.phone,
-          status: matchedOrder.status,
-          payment_status: matchedOrder.payment_status,
-        } : null,
+        order: matchedOrder
+          ? {
+              id: matchedOrder.id,
+              tracking_number: matchedOrder.tracking_number,
+              customer_name: matchedOrder.customer_name,
+              phone: matchedOrder.phone,
+              email: matchedOrder.email,
+              status: matchedOrder.status,
+              payment_status: matchedOrder.payment_status,
+            }
+          : null,
+      };
+    });
+
+    // 5b. Build enriched Razorpay Orders list
+    const enrichedOrders = razorpayOrders.map((o) => {
+      const matchedOrder = matchedOrdersMap.get(o.id);
+      return {
+        id: o.id,
+        entity: o.entity,
+        amount: (o.amount || 0) / 100,
+        amount_paid: (o.amount_paid || 0) / 100,
+        amount_due: (o.amount_due || 0) / 100,
+        currency: o.currency || 'INR',
+        receipt: o.receipt,
+        status: o.status, // 'created' | 'attempted' | 'paid'
+        attempts: o.attempts || 0,
+        notes: o.notes || {},
+        created_at: o.created_at ? new Date(o.created_at * 1000).toISOString() : new Date().toISOString(),
+        order: matchedOrder
+          ? {
+              id: matchedOrder.id,
+              tracking_number: matchedOrder.tracking_number,
+              customer_name: matchedOrder.customer_name,
+              phone: matchedOrder.phone,
+              email: matchedOrder.email,
+              status: matchedOrder.status,
+              payment_status: matchedOrder.payment_status,
+            }
+          : null,
       };
     });
 
@@ -187,6 +256,10 @@ export async function GET(request: Request) {
     const totalAttempts = enrichedPayments.length;
     const successRate = totalAttempts > 0 ? Math.round((totalCapturedCount / totalAttempts) * 100) : 100;
 
+    // Estimated Razorpay Fees: ~2% standard MDR + 18% GST (= 2.36%)
+    const estimatedFees = Math.round(totalCapturedVolume * 0.0236 * 100) / 100;
+    const netSettlementVolume = Math.max(0, Math.round((totalCapturedVolume - estimatedFees) * 100) / 100);
+
     // Methods breakdown
     const methodCounts: Record<string, number> = {};
     enrichedPayments.forEach((p) => {
@@ -194,31 +267,59 @@ export async function GET(request: Request) {
       methodCounts[m] = (methodCounts[m] || 0) + 1;
     });
 
+    // Failure reasons categorization
+    const failureReasons: Record<string, number> = {};
+    enrichedPayments
+      .filter((p) => p.status === 'failed')
+      .forEach((p) => {
+        const r = (p.error_description || p.error_reason || p.error_code || 'Declined by Bank').trim();
+        failureReasons[r] = (failureReasons[r] || 0) + 1;
+      });
+
+    // Orders created metrics
+    const totalOrdersCreated = enrichedOrders.length;
+    const ordersCreatedVolume = enrichedOrders.reduce((sum, o) => sum + o.amount, 0);
+
+    const resultData = {
+      payments: enrichedPayments,
+      orders: enrichedOrders,
+      events: paymentEvents,
+      stats: {
+        total_volume: totalCapturedVolume,
+        total_captured_count: totalCapturedCount,
+        failed_count: failedCount,
+        refunded_count: refundedCount,
+        refunded_volume: totalRefundedVolume,
+        success_rate: successRate,
+        total_attempts: totalAttempts,
+        total_orders_created: totalOrdersCreated,
+        orders_created_volume: ordersCreatedVolume,
+        estimated_fees: estimatedFees,
+        net_settlement_volume: netSettlementVolume,
+        method_breakdown: methodCounts,
+        failure_reasons_breakdown: failureReasons,
+      },
+      gateway_info: {
+        key_id: keyId,
+        masked_key: keyId ? `${keyId.slice(0, 10)}...${keyId.slice(-4)}` : 'Not configured',
+        is_live: keyId.startsWith('rzp_live_'),
+        webhook_url: `${storefrontUrl}/api/payments/webhook`,
+        webhook_secret: webhookSecret || '',
+        webhook_secret_configured: Boolean(webhookSecret),
+        gateway_error: gatewayError,
+      },
+    };
+
+    // Update memory micro-cache
+    memoryCache = {
+      timestamp: Date.now(),
+      data: resultData,
+    };
+
     return NextResponse.json({
       success: true,
-      data: {
-        payments: enrichedPayments,
-        events: paymentEvents,
-        stats: {
-          total_volume: totalCapturedVolume,
-          total_captured_count: totalCapturedCount,
-          failed_count: failedCount,
-          refunded_count: refundedCount,
-          refunded_volume: totalRefundedVolume,
-          success_rate: successRate,
-          total_attempts: totalAttempts,
-          method_breakdown: methodCounts,
-        },
-        gateway_info: {
-          key_id: keyId,
-          masked_key: keyId ? `${keyId.slice(0, 10)}...${keyId.slice(-4)}` : 'Not configured',
-          is_live: keyId.startsWith('rzp_live_'),
-          webhook_url: `${storefrontUrl}/api/payments/webhook`,
-          webhook_secret: webhookSecret || '',
-          webhook_secret_configured: Boolean(webhookSecret),
-          gateway_error: gatewayError,
-        },
-      },
+      cached: false,
+      data: resultData,
     });
   } catch (err: any) {
     console.error('[ADMIN_PAYMENTS_GET_ERROR]', err);
@@ -236,6 +337,9 @@ export async function POST(request: Request) {
     if (!isAuthed) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
     }
+
+    // Invalidate micro-cache on POST mutation
+    memoryCache = null;
 
     const body = await request.json();
     const action = String(body?.action || '').trim();
@@ -347,4 +451,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Action failed.', details: err?.message }, { status: 500 });
   }
 }
-
