@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 export function formatPrice(amount: number | string): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (isNaN(num)) return '₹0';
-  return `₹ ${num.toLocaleString('en-IN')}`;
+  return `₹ ${Math.round(num).toLocaleString('en-IN')}`;
 }
 
 export function formatDate(dateString: string): string {

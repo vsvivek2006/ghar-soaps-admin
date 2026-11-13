@@ -92,9 +92,6 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   };
 
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-  const whatsappUrl = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
-    `Hello ${customerName}, this is Ghar Soaps regarding your order #${order.id}. Current status: ${status}. Courier: ${carrier} (Tracking: ${trackingNumber || 'In Packing'}).`
-  )}`;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
@@ -225,15 +222,6 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-mono text-neutral-800 font-bold">+91 {cleanPhone}</span>
                   {email && <span className="text-neutral-500">{email}</span>}
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md hover:bg-emerald-100"
-                  >
-                    <MessageCircle className="w-3 h-3" />
-                    <span>WhatsApp Customer</span>
-                  </a>
                 </div>
                 <div className="text-neutral-600 pt-1">
                   {address}, {city}, {state} - <strong className="text-neutral-900">{pincode}</strong>

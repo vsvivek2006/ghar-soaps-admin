@@ -76,7 +76,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const {
     totalRevenue,
     totalOrders,
-    pendingOrders,
+    newOrders,
+    processingOrders,
     shippedOrders,
     deliveredOrders,
     avgOrderValue,
@@ -89,7 +90,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     dailyTrends,
   } = useMemo(() => {
     let rev = 0;
-    let pending = 0;
+    let confirmedCount = 0;
+    let processingCount = 0;
     let shipped = 0;
     let delivered = 0;
     let upi = 0;
@@ -112,7 +114,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const orderTotal = Number(o.total) || 0;
       rev += orderTotal;
 
-      if (o.status === 'Confirmed' || o.status === 'Processing') pending++;
+      if (o.status === 'Confirmed') confirmedCount++;
+      else if (o.status === 'Processing') processingCount++;
       else if (o.status === 'Shipped' || o.status === 'Out for Delivery') shipped++;
       else if (o.status === 'Delivered') delivered++;
 
@@ -182,7 +185,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return {
       totalRevenue: rev,
       totalOrders: totalCount,
-      pendingOrders: pending,
+      newOrders: confirmedCount,
+      processingOrders: processingCount,
       shippedOrders: shipped,
       deliveredOrders: delivered,
       avgOrderValue: totalCount > 0 ? Math.round(rev / totalCount) : 0,
@@ -247,40 +251,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 2. EXECUTIVE METRICS ROW (5 Cards) */}
+      {/* 2. EXECUTIVE METRICS ROW (5 Cards - Exact Lifecycle) */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <MetricCard
           title="Gross Sales"
           value={formatPrice(totalRevenue)}
-          subtitle={timeRange === 'all' ? '100% Prepaid collections' : `For selected ${timeRange}`}
+          subtitle={timeRange === 'all' ? '100% Prepaid volume' : `Selected ${timeRange}`}
           icon={<DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />}
           accentColor="emerald"
         />
         <MetricCard
-          title="Prepaid Orders"
+          title="Total Orders"
           value={totalOrders}
-          subtitle="100% verified online"
-          icon={<ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />}
-          accentColor="blue"
-        />
-        <MetricCard
-          title="Average Order (AOV)"
-          value={formatPrice(avgOrderValue)}
-          subtitle="Net basket size"
+          subtitle={`Avg ${formatPrice(avgOrderValue)} / basket`}
           icon={<Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />}
           accentColor="amber"
         />
         <MetricCard
-          title="To Be Dispatched"
-          value={pendingOrders}
-          subtitle="Awaiting courier pickup"
-          icon={<Clock className="w-4 h-4 sm:w-5 sm:h-5" />}
+          title="New Orders"
+          value={newOrders}
+          subtitle="Confirmed & to be packed"
+          icon={<ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />}
           accentColor="amber"
         />
         <MetricCard
-          title="In Transit"
+          title="In Packing"
+          value={processingOrders}
+          subtitle="Soap batches packaging"
+          icon={<Clock className="w-4 h-4 sm:w-5 sm:h-5" />}
+          accentColor="blue"
+        />
+        <MetricCard
+          title="Dispatched"
           value={shippedOrders}
-          subtitle="Out for delivery"
+          subtitle={`${deliveredOrders} delivered`}
           icon={<Truck className="w-4 h-4 sm:w-5 sm:h-5" />}
           accentColor="purple"
         />

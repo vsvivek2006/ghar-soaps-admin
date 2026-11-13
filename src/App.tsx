@@ -374,7 +374,7 @@ export const AppContent: React.FC = () => {
   );
 
   if (isLoading) {
-    return <GharLoader fullscreen customTitle="Starting Ghar Soaps Admin Portal" />;
+    return <GharLoader fullscreen />;
   }
 
   if (!isAuthenticated) {
