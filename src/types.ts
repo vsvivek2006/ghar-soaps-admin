@@ -133,6 +133,7 @@ export interface RazorpayLivePayment {
   } | null;
   email?: string | null;
   contact?: string | null;
+  fee?: number | null;
   error_code?: string | null;
   error_description?: string | null;
   error_reason?: string | null;
@@ -168,6 +169,11 @@ export interface RazorpayGatewayOrder {
     status: string;
     payment_status: string;
   } | null;
+  customer_details?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+  };
 }
 
 export interface PaymentWebhookEvent {
@@ -184,6 +190,7 @@ export interface PaymentWebhookEvent {
   vpa?: string | null;
   email?: string | null;
   contact?: string | null;
+  fee?: number | null;
   error_code?: string | null;
   error_description?: string | null;
   error_reason?: string | null;

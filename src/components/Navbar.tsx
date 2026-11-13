@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, RefreshCw, CheckCircle } from 'lucide-react';
+import { Menu, RefreshCw, CheckCircle, ShieldCheck } from 'lucide-react';
 import { ViewType } from './Sidebar';
 
 interface NavbarProps {
@@ -13,15 +13,15 @@ interface NavbarProps {
 const VIEW_TITLES: Record<ViewType, { title: string; subtitle: string }> = {
   dashboard: {
     title: 'Store Overview',
-    subtitle: 'Real-time sales, order volume, and fulfillment status.',
+    subtitle: 'Real-time sales, 100% prepaid orders, and fulfillment pipeline.',
   },
   orders: {
-    title: 'Orders',
+    title: 'Prepaid Orders',
     subtitle: 'Manage incoming orders, update shipping status, and view customer details.',
   },
   payments: {
-    title: 'Razorpay Live Payments',
-    subtitle: 'Real-time gateway tracking, captured transactions, and webhook audit.',
+    title: 'Customer Payments & Recovery',
+    subtitle: 'Real-time gateway tracking, success rates, and 1-click checkout recovery.',
   },
   customers: {
     title: 'Customers & Subscribers',
@@ -33,11 +33,11 @@ const VIEW_TITLES: Record<ViewType, { title: string; subtitle: string }> = {
   },
   products: {
     title: 'Product Catalog',
-    subtitle: 'Browse all active products, pricing, and variant details.',
+    subtitle: 'Browse all active products, pricing, stock, and variant details.',
   },
   settings: {
     title: 'Store Settings',
-    subtitle: 'Store profile, courier preferences, and admin account security.',
+    subtitle: 'Store profile, 100% prepaid policy, courier preferences, and security.',
   },
 };
 
@@ -51,41 +51,43 @@ export const Navbar: React.FC<NavbarProps> = ({
   const meta = VIEW_TITLES[currentView] || { title: 'Admin', subtitle: '' };
 
   return (
-    <header className="bg-white border-b border-neutral-200 sticky top-0 z-30 shadow-xs px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
+    <header className="bg-white/80 backdrop-blur-md border-b border-neutral-200/60 sticky top-0 z-30 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.02)] px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
       <div className="flex items-center gap-3">
         {/* Mobile menu hamburger button (< 768px) */}
         <button
           onClick={onOpenMobileSidebar}
-          className="md:hidden p-2 -ml-1 rounded-xl text-neutral-700 hover:bg-neutral-100 transition touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+          className="md:hidden p-2 -ml-1 rounded-xl text-neutral-700 hover:bg-neutral-100 transition touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
           aria-label="Open navigation menu"
         >
           <Menu className="w-5 h-5" />
         </button>
 
         <div>
-          <h1 className="text-base sm:text-lg font-extrabold text-neutral-900 tracking-tight font-heading">
+          <h1 className="text-base sm:text-lg font-black text-neutral-900 tracking-tight font-heading">
             {meta.title}
           </h1>
-          <p className="hidden sm:block text-xs text-neutral-400 font-medium">{meta.subtitle}</p>
+          <p className="text-xs text-neutral-400 hidden sm:block">
+            {meta.subtitle}
+          </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2.5">
-        {/* Online Status indicator */}
-        <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Live Store</span>
-        </div>
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* 100% Prepaid Badge */}
+        <span className="hidden lg:inline-flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span>100% Prepaid Store</span>
+        </span>
 
-        {/* Sync / Refresh Button */}
+        {/* Global Manual Refresh Button */}
         <button
           onClick={onRefresh}
           disabled={isRefreshing}
-          className="inline-flex items-center gap-1.5 text-xs font-bold bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white px-3.5 py-2 sm:px-4 sm:py-2 rounded-xl transition shadow-xs touch-manipulation min-h-[40px]"
+          className="flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-neutral-200/80 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-bold transition disabled:opacity-50 cursor-pointer shadow-2xs"
+          title="Refresh all store orders & customers"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
-          <span>({ordersCount})</span>
+          <RefreshCw className={`w-3.5 h-3.5 text-neutral-500 ${isRefreshing ? 'animate-spin text-emerald-600' : ''}`} />
+          <span className="hidden sm:inline">{isRefreshing ? 'Syncing...' : 'Sync Store'}</span>
         </button>
       </div>
     </header>

@@ -51,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'payments' as ViewType,
-      label: 'Live Payments',
+      label: 'Payments',
       icon: <CreditCard className="w-4 h-4" />,
     },
     {
@@ -78,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-full h-full bg-white border-r border-neutral-200 flex flex-col justify-between select-none">
+    <aside className="w-full h-full bg-white/80 backdrop-blur-xl border-r border-neutral-200/60 flex flex-col justify-between select-none">
       {/* Brand Header */}
       <div className="p-5 sm:p-6 border-b border-neutral-100 flex items-center justify-between">
         <div className="flex items-center gap-2.5">

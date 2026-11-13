@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatPrice } from '../lib/utils';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
+import { adminDataCache } from '../lib/adminDataCache';
+import { GharLoader } from '../components/GharLoader';
 import {
   Package,
   Search,
@@ -81,11 +83,12 @@ interface ProductsViewProps {
 }
 
 export const ProductsView: React.FC<ProductsViewProps> = ({ token }) => {
-  const [products, setProducts] = useState<AdminProduct[]>([]);
+  const cachedCatalog = adminDataCache.getCatalog();
+  const [products, setProducts] = useState<AdminProduct[]>(cachedCatalog?.products || []);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(!cachedCatalog);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -129,7 +132,9 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ token }) => {
       loadFallbackCatalog();
       return;
     }
-    setIsLoading(true);
+    if (!adminDataCache.hasValidCatalog()) {
+      setIsLoading(!adminDataCache.getCatalog());
+    }
     try {
       const res = await fetch('/api/products', {
         headers: { Authorization: `Bearer ${token}` },
@@ -151,6 +156,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ token }) => {
           images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [FALLBACK_PRODUCT_IMG],
         }));
         setProducts(mapped);
+        adminDataCache.setCatalog(mapped);
       } else {
         loadFallbackCatalog();
       }

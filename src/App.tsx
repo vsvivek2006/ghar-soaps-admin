@@ -18,11 +18,18 @@ import { CustomersView } from './views/CustomersView';
 import { ContactsView } from './views/ContactsView';
 import { ProductsView } from './views/ProductsView';
 import { SettingsView } from './views/SettingsView';
+import { GharLoader } from './components/GharLoader';
 
 export const AppContent: React.FC = () => {
   const { isAuthenticated, token, isLoading } = useAuth();
 
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+  const [visitedViews, setVisitedViews] = useState<Set<ViewType>>(new Set(['dashboard']));
+
+  const handleViewChange = useCallback((view: ViewType) => {
+    setCurrentView(view);
+    setVisitedViews((prev) => new Set(prev).add(view));
+  }, []);
   const [orders, setOrders] = useState<Order[]>([]);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [registeredCustomers, setRegisteredCustomers] = useState<RegisteredCustomer[]>([]);
@@ -367,16 +374,7 @@ export const AppContent: React.FC = () => {
   );
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-neutral-900 flex items-center justify-center p-4">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <div className="text-white text-xs font-semibold uppercase tracking-wider">
-            Loading Ghar Soaps Admin...
-          </div>
-        </div>
-      </div>
-    );
+    return <GharLoader fullscreen customTitle="Starting Ghar Soaps Admin Portal" />;
   }
 
   if (!isAuthenticated) {
@@ -384,7 +382,7 @@ export const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 flex flex-row font-sans text-neutral-900 antialiased">
+    <div className="min-h-screen bg-[#fbfbfd] flex flex-row font-sans text-neutral-900 antialiased">
       {/* Toast notifications */}
       <Toast
         message={toastMessage}
@@ -393,10 +391,10 @@ export const AppContent: React.FC = () => {
       />
 
       {/* 1. DESKTOP SIDEBAR */}
-      <div className="hidden md:flex w-64 shrink-0 flex-col sticky top-0 h-screen border-r border-neutral-200 bg-white z-20">
+      <div className="hidden md:flex w-64 shrink-0 flex-col sticky top-0 h-screen border-r border-neutral-200/60 bg-white/80 backdrop-blur-xl z-20">
         <Sidebar
           currentView={currentView}
-          onChangeView={setCurrentView}
+          onChangeView={handleViewChange}
           pendingCount={pendingCount}
           newInquiriesCount={newInquiriesCount}
         />
@@ -412,7 +410,7 @@ export const AppContent: React.FC = () => {
           <div className="relative w-72 max-w-[85vw] bg-white z-10 flex flex-col justify-between h-full shadow-2xl animate-fade-in">
             <Sidebar
               currentView={currentView}
-              onChangeView={setCurrentView}
+              onChangeView={handleViewChange}
               pendingCount={pendingCount}
               newInquiriesCount={newInquiriesCount}
               isOpen={true}
@@ -434,52 +432,75 @@ export const AppContent: React.FC = () => {
         />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {currentView === 'dashboard' && (
+          {/* TAB 1: DASHBOARD (Instant & Persistent) */}
+          <div className={currentView === 'dashboard' ? 'block' : 'hidden'}>
             <DashboardView
               orders={orders}
               subscribersCount={subscribers.length}
               registeredCustomersCount={registeredCustomers.length}
               onOpenOrder={setActiveOrder}
-              onChangeView={setCurrentView}
+              onChangeView={handleViewChange}
               onExportCSV={handleExportCSV}
             />
+          </div>
+
+          {/* TAB 2: ORDERS (Instant & Persistent) */}
+          {visitedViews.has('orders') && (
+            <div className={currentView === 'orders' ? 'block' : 'hidden'}>
+              <OrdersView
+                orders={orders}
+                onOpenOrder={setActiveOrder}
+                onDeleteOrder={handleDeleteOrder}
+                onExportCSV={handleExportCSV}
+              />
+            </div>
           )}
 
-          {currentView === 'orders' && (
-            <OrdersView
-              orders={orders}
-              onOpenOrder={setActiveOrder}
-              onDeleteOrder={handleDeleteOrder}
-              onExportCSV={handleExportCSV}
-            />
+          {/* TAB 3: PAYMENTS (Instant & Persistent) */}
+          {visitedViews.has('payments') && (
+            <div className={currentView === 'payments' ? 'block' : 'hidden'}>
+              <PaymentsView token={token} onOpenOrder={setActiveOrder} />
+            </div>
           )}
 
-          {currentView === 'payments' && (
-            <PaymentsView token={token} onOpenOrder={setActiveOrder} />
+          {/* TAB 4: CUSTOMERS (Instant & Persistent) */}
+          {visitedViews.has('customers') && (
+            <div className={currentView === 'customers' ? 'block' : 'hidden'}>
+              <CustomersView
+                orders={orders}
+                subscribers={subscribers}
+                registeredCustomers={registeredCustomers}
+                onUpdateCustomer={handleUpdateCustomer}
+                onDeleteCustomer={handleDeleteCustomer}
+                onRefresh={fetchCustomers}
+              />
+            </div>
           )}
 
-          {currentView === 'customers' && (
-            <CustomersView
-              orders={orders}
-              subscribers={subscribers}
-              registeredCustomers={registeredCustomers}
-              onUpdateCustomer={handleUpdateCustomer}
-              onDeleteCustomer={handleDeleteCustomer}
-              onRefresh={fetchCustomers}
-            />
+          {/* TAB 5: CONTACTS (Instant & Persistent) */}
+          {visitedViews.has('contacts') && (
+            <div className={currentView === 'contacts' ? 'block' : 'hidden'}>
+              <ContactsView
+                inquiries={inquiries}
+                onUpdateInquiry={handleUpdateInquiry}
+                onDeleteInquiry={handleDeleteInquiry}
+              />
+            </div>
           )}
 
-          {currentView === 'contacts' && (
-            <ContactsView
-              inquiries={inquiries}
-              onUpdateInquiry={handleUpdateInquiry}
-              onDeleteInquiry={handleDeleteInquiry}
-            />
+          {/* TAB 6: PRODUCTS (Instant & Persistent) */}
+          {visitedViews.has('products') && (
+            <div className={currentView === 'products' ? 'block' : 'hidden'}>
+              <ProductsView token={token} />
+            </div>
           )}
 
-          {currentView === 'products' && <ProductsView token={token} />}
-
-          {currentView === 'settings' && <SettingsView />}
+          {/* TAB 7: SETTINGS (Instant & Persistent) */}
+          {visitedViews.has('settings') && (
+            <div className={currentView === 'settings' ? 'block' : 'hidden'}>
+              <SettingsView />
+            </div>
+          )}
         </main>
       </div>
 
