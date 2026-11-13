@@ -99,7 +99,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Order ID is required.' }, { status: 400 });
     }
 
-    const allowedStatuses = ['Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'];
+    const allowedStatuses = ['Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Pending Payment', 'Payment Failed'];
     const safeStatus = status && allowedStatuses.includes(status) ? status : null;
     const safeCarrier = carrier ? cleanInput(carrier, 80) : null;
     const safeTracking = trackingNumber ? cleanInput(trackingNumber, 50) : null;
@@ -107,6 +107,26 @@ export async function PATCH(request: Request) {
     const safeLocation = location ? cleanInput(location, 100) : null;
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    // Verification Guard: Never allow unpaid orders to be moved to fulfillment statuses
+    const { data: existingOrder } = await supabaseAdmin
+      .from('orders')
+      .select('id, payment_status, status')
+      .eq('id', safeId)
+      .maybeSingle();
+
+    if (!existingOrder) {
+      return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
+    }
+
+    const fulfillmentStatuses = ['Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
+    if (safeStatus && fulfillmentStatuses.includes(safeStatus) && (existingOrder.payment_status || '').toLowerCase() !== 'paid') {
+      return NextResponse.json(
+        { error: 'Fulfillment Blocked: Cannot confirm or dispatch an unpaid order. Payment must be verified.' },
+        { status: 400 }
+      );
+    }
+
     const updates: any = { updated_at: new Date().toISOString() };
     if (safeStatus) updates.status = safeStatus;
     if (safeCarrier) updates.carrier = safeCarrier;

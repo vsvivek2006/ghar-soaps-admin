@@ -17,6 +17,8 @@ import {
   Edit3,
   MapPin,
   User,
+  AlertCircle,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface OrderDetailModalProps {
@@ -67,8 +69,14 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const isPaid = (order?.payment_status || '').toLowerCase() === 'paid';
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isPaid && ['Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'].includes(status)) {
+      alert('Fulfillment Blocked: You cannot confirm or dispatch an order where payment has not been verified as paid.');
+      return;
+    }
     setIsSaving(true);
     await onUpdateStatus(order.id, status, carrier, trackingNumber, note, {
       customer_name: customerName,
@@ -136,6 +144,21 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs">
+          {/* Unpaid Order Alert Banner */}
+          {!isPaid && (
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-4 flex items-start gap-3">
+              <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <div className="font-black text-amber-900 text-xs uppercase tracking-wide">
+                  Payment Not Verified / Dropped Checkout
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                  Online payment was NOT captured via Razorpay for this order. It is excluded from sales revenue and cannot be dispatched or confirmed.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Customer & Delivery Card */}
           <div className="bg-neutral-50/70 p-4 sm:p-5 rounded-2xl border border-neutral-200/80 space-y-3">
             <div className="flex items-center justify-between">
@@ -235,8 +258,20 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                     </strong>
                   </span>
                   {order.payment_status && (
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold uppercase text-[10px]">
-                      {order.payment_status}
+                    <span
+                      className={`px-2 py-0.5 rounded font-extrabold uppercase text-[10px] border ${
+                        isPaid
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : order.payment_status === 'failed' || order.status === 'Payment Failed'
+                          ? 'bg-rose-50 text-rose-800 border-rose-200'
+                          : 'bg-amber-50 text-amber-900 border-amber-200'
+                      }`}
+                    >
+                      {isPaid
+                        ? '✓ Payment Captured (Paid)'
+                        : order.payment_status === 'failed' || order.status === 'Payment Failed'
+                        ? '❌ Payment Failed'
+                        : '⏳ Unpaid (Pending)'}
                     </span>
                   )}
                   {order.razorpay_payment_id && (
@@ -341,12 +376,22 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   onChange={(e) => setStatus(e.target.value as OrderStatus)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 bg-white font-bold text-neutral-900 focus:outline-none focus:border-black text-xs"
                 >
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Processing">Processing (Packing)</option>
-                  <option value="Shipped">Shipped</option>
-                  <option value="Out for Delivery">Out for Delivery</option>
-                  <option value="Delivered">Delivered</option>
-                  <option value="Cancelled">Cancelled</option>
+                  {isPaid ? (
+                    <>
+                      <option value="Confirmed">Confirmed</option>
+                      <option value="Processing">Processing (Packing)</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="Out for Delivery">Out for Delivery</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Pending Payment">Pending Payment (Unpaid)</option>
+                      <option value="Payment Failed">Payment Failed</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </>
+                  )}
                 </select>
               </div>
 

@@ -71,6 +71,10 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
 
     orders.forEach((o) => {
       const key = o.phone.trim();
+      const isPaid = (o.payment_status || '').toLowerCase() === 'paid' && o.status !== 'Cancelled';
+      const orderAmount = isPaid ? (Number(o.total) || 0) : 0;
+      const orderIncrement = isPaid ? 1 : 0;
+
       if (!customerMap.has(key)) {
         customerMap.set(key, {
           name: o.customer_name,
@@ -78,14 +82,14 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
           email: o.email,
           city: o.city,
           state: o.state,
-          totalSpent: Number(o.total) || 0,
-          orderCount: 1,
+          totalSpent: orderAmount,
+          orderCount: orderIncrement,
           lastOrderDate: o.created_at,
         });
       } else {
         const existing = customerMap.get(key)!;
-        existing.totalSpent += Number(o.total) || 0;
-        existing.orderCount += 1;
+        existing.totalSpent += orderAmount;
+        existing.orderCount += orderIncrement;
         if (new Date(o.created_at) > new Date(existing.lastOrderDate)) {
           existing.lastOrderDate = o.created_at;
         }

@@ -48,10 +48,12 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     const q = debouncedSearch.toLowerCase().trim();
     return orders.filter((order) => {
       const matchesStatus = selectedStatus === 'All' || order.status === selectedStatus;
+      const payStatus = (order.payment_status || '').toLowerCase();
       const matchesPayment =
         paymentFilter === 'All' ||
-        (paymentFilter === 'cod' && order.payment_method?.toLowerCase() === 'cod') ||
-        (paymentFilter === 'prepaid' && order.payment_method?.toLowerCase() !== 'cod');
+        (paymentFilter === 'paid' && payStatus === 'paid') ||
+        (paymentFilter === 'unpaid' && (payStatus === 'pending_payment' || order.status === 'Pending Payment')) ||
+        (paymentFilter === 'failed' && (payStatus === 'failed' || order.status === 'Payment Failed'));
 
       const matchesQuery =
         !q ||
@@ -72,6 +74,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
     'Shipped',
     'Out for Delivery',
     'Delivered',
+    'Pending Payment',
+    'Payment Failed',
     'Cancelled',
   ];
 
@@ -124,9 +128,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               onChange={(e) => setPaymentFilter(e.target.value)}
               className="flex-1 sm:flex-initial px-3 py-2.5 rounded-2xl border border-neutral-300 text-xs font-bold text-neutral-700 bg-white focus:outline-none focus:border-black"
             >
-              <option value="All">All Payments</option>
-              <option value="cod">Cash on Delivery (COD)</option>
-              <option value="prepaid">Prepaid</option>
+              <option value="All">All Payment Status</option>
+              <option value="paid">✓ Paid & Verified</option>
+              <option value="unpaid">⏳ Pending / Unpaid</option>
+              <option value="failed">❌ Failed / Dropped</option>
             </select>
 
             {/* Export CSV */}
@@ -220,8 +225,20 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                         <span className="font-extrabold text-neutral-950 text-sm">
                           {formatPrice(order.total)}
                         </span>
-                        <span className="text-[10px] text-neutral-400 block">
-                          {order.payment_method?.toUpperCase()}
+                        <span
+                          className={`text-[10px] font-extrabold block uppercase ${
+                            order.payment_status === 'paid'
+                              ? 'text-emerald-700'
+                              : order.payment_status === 'failed' || order.status === 'Payment Failed'
+                              ? 'text-rose-600'
+                              : 'text-amber-700'
+                          }`}
+                        >
+                          {order.payment_status === 'paid'
+                            ? `✓ Paid (${order.payment_method || 'Online'})`
+                            : order.payment_status === 'failed' || order.status === 'Payment Failed'
+                            ? '❌ Payment Failed'
+                            : '⏳ Unpaid (Pending)'}
                         </span>
                       </div>
                     </div>
@@ -292,9 +309,22 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                         {formatPrice(order.total)}
                       </td>
                       <td className="py-3.5 px-5 whitespace-nowrap">
-                        <span className="uppercase text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-700 border border-neutral-200">
-                          {order.payment_method}
-                        </span>
+                        {order.payment_status === 'paid' ? (
+                          <span className="inline-flex items-center gap-1 uppercase text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Paid ({order.payment_method || 'Online'})
+                          </span>
+                        ) : order.payment_status === 'failed' || order.status === 'Payment Failed' ? (
+                          <span className="inline-flex items-center gap-1 uppercase text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-rose-50 text-rose-800 border border-rose-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                            Failed / Unpaid
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 uppercase text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            Pending Payment
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-5 whitespace-nowrap">
                         <StatusBadge status={order.status} />

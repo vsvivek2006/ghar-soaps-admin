@@ -73,6 +73,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [orders, timeRange]);
 
   // Aggregate executive metrics (100% Prepaid Model - Zero COD)
+  // CRITICAL: Strictly count only VERIFIED PAID orders for revenue, sales, and products
   const {
     totalRevenue,
     totalOrders,
@@ -80,6 +81,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     processingOrders,
     shippedOrders,
     deliveredOrders,
+    pendingOrdersCount,
     avgOrderValue,
     upiOrders,
     cardOrders,
@@ -110,7 +112,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       dayMap.set(key, { count: 0, revenue: 0 });
     }
 
-    for (const o of filteredOrders) {
+    // Filter strictly verified paid orders (exclude unpaid checkouts, failed payments, or cancelled)
+    const paidOrders = filteredOrders.filter((o) => {
+      const payStatus = (o.payment_status || '').toLowerCase();
+      const status = (o.status || '').toLowerCase();
+      return payStatus === 'paid' && status !== 'cancelled' && status !== 'payment failed';
+    });
+
+    // Count pending/dropped checkouts separately for auditing
+    const pendingCount = filteredOrders.filter((o) => {
+      const payStatus = (o.payment_status || '').toLowerCase();
+      const status = (o.status || '').toLowerCase();
+      return payStatus === 'pending_payment' || status === 'pending payment';
+    }).length;
+
+    for (const o of paidOrders) {
       const orderTotal = Number(o.total) || 0;
       rev += orderTotal;
 
@@ -136,7 +152,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         stateMap.set(cleanState, (stateMap.get(cleanState) || 0) + 1);
       }
 
-      // Products breakdown
+      // Products breakdown (strictly paid)
       if (Array.isArray(o.order_items)) {
         for (const item of o.order_items) {
           const title = item.title || 'Handcrafted Soap';
@@ -152,7 +168,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }
       }
 
-      // Daily 7-day velocity
+      // Daily 7-day velocity (strictly paid)
       const orderDate = new Date(o.created_at);
       const dayKey = orderDate.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
       if (dayMap.has(dayKey)) {
@@ -180,20 +196,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       revenue: data.revenue,
     }));
 
-    const totalCount = filteredOrders.length;
+    const paidCount = paidOrders.length;
 
     return {
       totalRevenue: rev,
-      totalOrders: totalCount,
+      totalOrders: paidCount,
       newOrders: confirmedCount,
       processingOrders: processingCount,
       shippedOrders: shipped,
       deliveredOrders: delivered,
-      avgOrderValue: totalCount > 0 ? Math.round(rev / totalCount) : 0,
+      pendingOrdersCount: pendingCount,
+      avgOrderValue: paidCount > 0 ? Math.round(rev / paidCount) : 0,
       upiOrders: upi,
       cardOrders: card,
       otherPrepaidOrders: otherPrepaid,
-      recentOrders: filteredOrders.slice(0, 7),
+      recentOrders: paidOrders.slice(0, 7),
       topProducts: sortedProducts,
       topStates: sortedStates,
       dailyTrends: trends,
