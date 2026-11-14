@@ -486,7 +486,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ token }) => {
               </thead>
               <tbody className="divide-y divide-neutral-100/70">
                 {filteredPayments.map((p) => {
-                  const amountRounded = Math.round(p.amount / 100);
+                  const amountRounded = Math.round(p.amount);
                   return (
                     <tr key={p.id} className="hover:bg-neutral-50/50 transition">
                       <td className="py-3.5 px-5">
@@ -559,7 +559,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ token }) => {
               </div>
               <div className="flex justify-between py-2 border-b border-neutral-100">
                 <span className="text-neutral-500">Amount Paid:</span>
-                <span className="font-black text-neutral-900 text-sm">{formatPrice(Math.round(selectedPayment.amount / 100))}</span>
+                <span className="font-black text-neutral-900 text-sm">{formatPrice(Math.round(selectedPayment.amount))}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-neutral-100">
                 <span className="text-neutral-500">Status:</span>
